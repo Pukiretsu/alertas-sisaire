@@ -51,7 +51,7 @@ Para poder ejecutar el proyecto es necesario instalar
 ### 1. Clonar el Repositorio
 Obtén la última versión del código fuente desde el servidor:
 ```bash
-git clone [https://github.com/tu-usuario/nombre-del-proyecto.git](https://github.com/tu-usuario/nombre-del-proyecto.git)
+git clone [https://github.com/Pukiretsu/alertas-sisaire.git](https://github.com/Pukiretsu/alertas-sisaire.git)
 cd nombre-del-proyecto
 ```
 
