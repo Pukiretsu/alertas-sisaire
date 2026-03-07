@@ -1,2 +1,25 @@
-pandas
-requests
+# --- Ingesta y Scraping (JSF) ---
+playwright==1.42.0          # Recomendado sobre Selenium por su manejo de contextos y velocidad
+beautifulsoup4==4.12.3      # Para parsear el HTML extraído de los componentes JSF
+
+# --- Motor de Cálculo ---
+pandas==2.2.1               # Gestión de medias móviles y ventanas de tiempo
+numpy==1.26.4               # Operaciones matemáticas vectorizadas
+python-dateutil==2.9.0      # Manejo avanzado de zonas horarias y fechas ambientales
+
+# --- Base de Datos y Persistencia ---
+sqlalchemy==2.0.28          # ORM para interactuar con PostgreSQL
+psycopg2-binary==2.9.9      # Driver para PostgreSQL
+python-dotenv==1.0.1        # Carga de variables de entorno desde el archivo .env
+
+# --- Sincronización y Tareas ---
+APScheduler==3.10.4         # Programador de tareas para ejecuciones cada 1h y 24h
+
+# --- Notificaciones y API (Opcional pero recomendado) ---
+fastapi==0.110.0            # Para exponer los resultados en una api publica
+uvicorn==0.27.1             # Servidor ASGI para FastAPI
+requests==2.31.0            # Para envíos de alertas vía Webhooks (Telegram/Email)
+
+# --- Pruebas y Calidad ---
+pytest==8.0.2               # Pruebas unitarias para el motor de cálculo
+black==24.2.0               # Formateador de código para que los 6 sigan el mismo estilo
