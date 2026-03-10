@@ -1,12 +1,5 @@
-import logging
-from src.utils.configs import Config
-from src.ingestion.ingestion import SISAIREscrapper 
+from src.engine.calculate import Engine
 
-logger = logging.getLogger(__name__)
-
-def main():
-    logger.info("Iniciando Sistema Calidad Aire...")
-    #TODO: Montar todo xd
-
-if __name__ == "__main__":
-    main()
+if __name__== "__main__":
+    motor=Engine()
+    motor.calcular_media_movil()
