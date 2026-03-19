@@ -1,0 +1,70 @@
+import logging
+import pandas as pd
+from enum import Enum
+
+logger = logging.getLogger(__name__)
+
+
+class EstadoCalidadAire(Enum):
+    NORMAL = "Normal"
+    SEGUIMIENTO = "Seguimiento"
+    PREVENCION = "Prevención"
+    ALERTA = "Alerta"
+    EMERGENCIA = "Emergencia"
+    FINALIZADA = "Finalizada"
+
+
+def desescalar_estado(estado_actual):
+    transiciones = {
+        EstadoCalidadAire.EMERGENCIA: EstadoCalidadAire.ALERTA,
+        EstadoCalidadAire.ALERTA: EstadoCalidadAire.PREVENCION,
+        EstadoCalidadAire.PREVENCION: EstadoCalidadAire.SEGUIMIENTO,
+        EstadoCalidadAire.SEGUIMIENTO: EstadoCalidadAire.NORMAL,
+    }
+    return transiciones.get(estado_actual, estado_actual)
+
+
+def evaluar_cierre_alerta(df: pd.DataFrame, umbral: float, estado_actual: EstadoCalidadAire):
+    """
+    Implementa:
+    ✔ Cierre de alerta (mejora sostenida 24h)
+    ✔ Desescalamiento progresivo (12h)
+
+    df: columnas ['timestamp', 'valor']
+    """
+
+    if df.empty:
+        logger.warning("DataFrame vacío, no se evalúa estado")
+        return estado_actual
+
+    df = df.sort_values("timestamp")
+
+    # 🔹 Últimas 24 horas
+    ultimas_24h = df.tail(24)
+
+    if len(ultimas_24h) < 24:
+        logger.info("Datos insuficientes para cierre (24h)")
+        return estado_actual
+
+    # ✅ CIERRE TOTAL
+    if (ultimas_24h["valor"] < umbral).all():
+        if estado_actual in [
+            EstadoCalidadAire.ALERTA,
+            EstadoCalidadAire.EMERGENCIA,
+            EstadoCalidadAire.PREVENCION,
+        ]:
+            logger.info("Cierre de alerta: valores bajos sostenidos 24h")
+            return EstadoCalidadAire.FINALIZADA
+
+    # 🔽 DESESCALAMIENTO PROGRESIVO (12h)
+    ultimas_12h = df.tail(12)
+
+    if len(ultimas_12h) >= 12 and (ultimas_12h["valor"] < umbral).all():
+        nuevo_estado = desescalar_estado(estado_actual)
+
+        if nuevo_estado != estado_actual:
+            logger.info(f"Desescalamiento: {estado_actual.value} → {nuevo_estado.value}")
+
+        return nuevo_estado
+
+    return estado_actual
