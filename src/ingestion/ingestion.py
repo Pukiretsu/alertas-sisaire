@@ -1,75 +1,69 @@
 import logging
 import re, urllib
-from os import path
+from os import path, wait
 import time
 from playwright.sync_api import sync_playwright
 from src.utils.configs import Config
 
 logger = logging.getLogger(__name__)
 
-
 class SISAIREscrapper:
-    def __init__(self, headless=True) -> None:
+    def __init__(self, ids_estaciones_consulta, contaminante, fecha_inicio, fecha_fin, headless=True) -> None:
         self.headless = headless
-    
+        self.ids_estaciones_consulta = ids_estaciones_consulta
+        self.contaminante = contaminante
+        self.fecha_inicio = fecha_inicio
+        self.fecha_fin = fecha_fin
+
     def block_irrelevant_content(self, context):
         """Bloquea imágenes y otros recursos innecesarios para acelerar la carga."""
         def interceptar(route):
             recursos_ignorar = ["image", "font", "media"]
             
             if route.request.resource_type in recursos_ignorar:
-                logger.debug(f"Bloqueando carga de: {route.request.url}")
+                #logger.debug(f"Bloqueando carga de: {route.request.url}")
                 route.abort()
             else:
                 route.continue_()
 
         context.route("**/*", interceptar)
-    
-    def activar_traza_red(self, page):
-        """Monitorea y loguea todas las peticiones POST (AJAX/Fetch)."""
-    
-        def on_request(request):
-            if request.method == "POST":
-                print(f"\n🚀 [POST] -> {request.url}")
-                post_data = request.post_data
-                if post_data:
-                    match = re.search(r'javax\.faces\.ViewState=([^&]+)', post_data)
-                    
-                    if match:
-                        view_state_encoded = match.group(1)
-                        view_state_decoded = urllib.parse.unquote(view_state_encoded)
-                        print(f"    🔑 ViewState en Payload: {view_state_decoded}")
-                    else:
-                        print("    ⚠️ No se encontró ViewState en el Payload.")
 
-        def on_response(response):
-            if response.request.method == "POST":
-                status = response.status
-                print(f"✅ [RES] <- Status: {status} para {response.url}")
+    def wait_until_loaded(self, page):
+        page.wait_for_function("() => PrimeFaces.ajax.Queue.isEmpty()", timeout=120000)
 
-        page.on("request", on_request)
-        page.on("response", on_response)
-
-    def get_departamentos(self, page):
-        logger.info("Extrayendo lista de departamentos...")
-    
-        selector_dropdown = 'div[id="filtroForm:departamentoSel"]'
+    def select_estaciones(self, page):
+        selector_dropdown = 'div[id="filtroForm:estacionesSel"]'
         page.click(selector_dropdown)
-    
-        selector_lista = 'ul[id="filtroForm:departamentoSel_items"]'
-        page.wait_for_selector(selector_lista, state="visible")
+        
+        selector_panel = 'div[id="filtroForm:estacionesSel_panel"]'
+        page.wait_for_selector(selector_panel, state="visible")
 
-        departamentos = page.locator(f"{selector_lista} li").evaluate_all("""
-            elements => elements.map(el => ({
-                "nombre": el.getAttribute('data-label'),
-                "id_interno": el.id
-            }))
-        """)
-
-        departamentos = [d for d in departamentos if d['nombre'] != 'Todos']
+        for estacion_id in self.ids_estaciones_consulta:
+            selector_estacion = page.locator(f'li[data-item-value="{estacion_id}"]')
+            checkbox = selector_estacion.locator(".ui-chkbox-box")
+            checkbox.click()
+        
+        page.click(selector_dropdown)
+        logger.info(f"{len(self.ids_estaciones_consulta)} Estaciones seleccionadas...")
     
-        logger.info(f"Se encontraron {len(departamentos)} departamentos.")
-        return departamentos
+    def select_contaminantes(self, page):
+        selector_dropdown = 'div[id="filtroForm:contaminanteSel"]'
+        page.click(selector_dropdown)
+        
+        selector_panel = 'div[id="filtroForm:contaminanteSel_panel"]'
+        page.wait_for_selector(selector_panel, state="visible")
+
+        selector_contaminante = page.locator(f'ul[id="filtroForm:contaminanteSel_items"]')
+        if not self.contaminante:
+            return
+        else:
+            item_contaminante = selector_contaminante.locator(f'li[data-label="{self.contaminante}"]')
+            item_contaminante.click()
+        
+        page.click(selector_dropdown)
+
+    def select_fechas(self, page):
+        pass
 
     def start_scrapping(self):
         with sync_playwright() as p:
@@ -86,7 +80,6 @@ class SISAIREscrapper:
             
             self.block_irrelevant_content(context)
             page = context.new_page()
-            self.activar_traza_red(page)
 
             try:
                 target_url = Config.JSF_TARGET_URL
@@ -95,20 +88,31 @@ class SISAIREscrapper:
                 logger.info(f"Navegando en {target_url}")
                 
                 page.goto(target_url, wait_until="networkidle") 
-                page.wait_for_function("() => PrimeFaces.ajax.Queue.isEmpty()", timeout=120000)
+                self.wait_until_loaded(page)
+                logger.info("Pagina cargada")
                 
-                logger.debug("Pagina cargada")
+                logger.debug("Seleccionando estaciones")
+                self.select_estaciones(page)
+                self.wait_until_loaded(page)
                 
-                deptos = self.get_departamentos(page)
-                print(deptos)
+                if not self.contaminante:
+                    logger.info("Seleccionando todos los contaminantes")
+                else:
+                    logger.info(f"Seleccionando Contaminante: {self.contaminante}")
+                    self.select_contaminantes(page)
+                    self.wait_until_loaded(page)
                 
-                selector_dropdown = 'li[id="filtroForm:departamentoSel_5"]'
-                page.click(selector_dropdown)
+                logger.info(f"Seleccionando datos desde {self.fecha_inicio} hasta {self.fecha_fin}")
+                self.select_fechas(page)
+                self.wait_until_loaded(page)
+                time.sleep(20)
+                
+                selector_button = 'button[id="filtroForm:btnConsultar"]'
+                page.click(selector_button)
+                self.wait_until_loaded(page)
+                logger.info("Pagina cargada completamente...")
 
-                page.wait_for_function("() => PrimeFaces.ajax.Queue.isEmpty()", timeout=120000)
-                logger.debug('Departamento seleccionado')
-
-                time.sleep(5)
+                time.sleep(60)
 
             except Exception as e:
                 logger.error(f"Error en la navegación: {e}")
@@ -119,6 +123,18 @@ class SISAIREscrapper:
 
 if __name__ == "__main__":
     logger.info("Modo de prueba local del Scrapper iniciado...")
+    
+    ids_estaciones_consulta = [
+        "29586", "31877", "8249", "31862", "8254", "8243", 
+        "31867", "31866", "31865", "31860", "31869", "31805", 
+        "31807", "31863", "31864", "29617", "30040", "32089", 
+        "31953", "31870", "8250", "31952", "8252"
+    ]
+    
+    contaminante = "PM2.5"
 
-    scrapper = SISAIREscrapper(headless=False)
+    fecha_inicio = "2023-01-01"
+    fecha_fin = "2023-01-02"
+
+    scrapper = SISAIREscrapper(ids_estaciones_consulta, contaminante,fecha_inicio, fecha_fin, headless=False)
     result = scrapper.start_scrapping()
