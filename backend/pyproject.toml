@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "air-quality-alerts-bogota"
+version = "1.4.0"
+description = "Motor de cálculo de alertas PM2.5 con FastAPI, Playwright, React, Vite y Tailwind."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Duvan Acevedo" }]
+dependencies = [
+  "pandas==2.2.1",
+  "numpy==1.26.4",
+  "python-dateutil==2.9.0",
+  "openpyxl==3.1.2",
+  "fastapi==0.110.0",
+  "uvicorn==0.27.1",
+  "python-multipart==0.0.9",
+  "playwright==1.42.0",
+  "python-dotenv==1.0.1",
+  "colorlog==6.8.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.0.2",
+  "pytest-cov==4.1.0",
+  "ruff==0.3.4",
+  "black==24.2.0",
+]
+
+[project.scripts]
+air-quality-alerts = "air_quality_alerts.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]

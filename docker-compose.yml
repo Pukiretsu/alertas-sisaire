@@ -1,0 +1,15 @@
+services:
+  api:
+    build:
+      context: ./backend
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      OUTPUTS_DIR: /app/outputs
+      DOWNLOADS_DIR: /app/downloads
+      ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./outputs:/app/outputs
+      - ./downloads:/app/downloads

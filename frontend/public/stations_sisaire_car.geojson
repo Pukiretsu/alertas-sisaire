@@ -1,0 +1,995 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.142125,
+          4.530864
+        ]
+      },
+      "properties": {
+        "station_id": "29586",
+        "station_name": "BOGOTA RURAL - MOCHUELO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2683.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.01097625,
+          4.957911483
+        ]
+      },
+      "properties": {
+        "station_id": "29615",
+        "station_name": "CAJICA - MANAS",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2567.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.053345,
+          4.923668
+        ]
+      },
+      "properties": {
+        "station_id": "31877",
+        "station_name": "CAJICA - UMNG",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2650.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.968682,
+          4.719498
+        ]
+      },
+      "properties": {
+        "station_id": "8249",
+        "station_name": "CALERA - URBANO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2691.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.057121,
+          4.861411
+        ]
+      },
+      "properties": {
+        "station_id": "31862",
+        "station_name": "CHIA - URBANO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2705.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.97698601,
+          5.054945225
+        ]
+      },
+      "properties": {
+        "station_id": "8254",
+        "station_name": "COGUA - PTAR I",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2594.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.101009,
+          4.80958
+        ]
+      },
+      "properties": {
+        "station_id": "8243",
+        "station_name": "COTA - URBANO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.77903,
+          5.229052
+        ]
+      },
+      "properties": {
+        "station_id": "31867",
+        "station_name": "CUCUNUBA - COLEGIO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 1245.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.345856,
+          4.843932
+        ]
+      },
+      "properties": {
+        "station_id": "31872",
+        "station_name": "FACATATIVA - URBANO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2705.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.215716,
+          4.717045
+        ]
+      },
+      "properties": {
+        "station_id": "31861",
+        "station_name": "FUNZA - COLEGIO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2532.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.21171239,
+          4.716524889
+        ]
+      },
+      "properties": {
+        "station_id": "9166",
+        "station_name": "FUNZA - SISBEN",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2563.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.451599,
+          4.292941
+        ]
+      },
+      "properties": {
+        "station_id": "31955",
+        "station_name": "FUSAGASUGA - URBANO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 1720.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.803848,
+          4.321046
+        ]
+      },
+      "properties": {
+        "station_id": "31924",
+        "station_name": "GIRARDOT - URBANO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2705.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.672256,
+          5.38562
+        ]
+      },
+      "properties": {
+        "station_id": "31866",
+        "station_name": "GUACHETA - COLEGIO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 1234.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.657837,
+          5.306967
+        ]
+      },
+      "properties": {
+        "station_id": "31865",
+        "station_name": "LENGUAZAQUE - ESTADIO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2123.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.266157,
+          4.733274
+        ]
+      },
+      "properties": {
+        "station_id": "31860",
+        "station_name": "MADRID - CEMODAE",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2554.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.393921,
+          3.819894
+        ]
+      },
+      "properties": {
+        "station_id": "31869",
+        "station_name": "MOCHUELO - COLEGIO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 1245.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.23638,
+          4.72138
+        ]
+      },
+      "properties": {
+        "station_id": "31533",
+        "station_name": "MOSQUERA - DCMA",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2546.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.22254747,
+          4.687882774
+        ]
+      },
+      "properties": {
+        "station_id": "8248",
+        "station_name": "MOSQUERA - SENA",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2543.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.222778,
+          4.708611
+        ]
+      },
+      "properties": {
+        "station_id": "32088",
+        "station_name": "MOSQUERA - URBANO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2516.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.23194172,
+          4.7026875
+        ]
+      },
+      "properties": {
+        "station_id": "9173",
+        "station_name": "MOSQUERA VILLA OLIMPICA",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2547.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.25440833,
+          4.724619444
+        ]
+      },
+      "properties": {
+        "station_id": "9172",
+        "station_name": "Madrid-PTAR I",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2548.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.861771,
+          5.094984
+        ]
+      },
+      "properties": {
+        "station_id": "31805",
+        "station_name": "NEMOCON - URBANO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.89588519,
+          5.129058937
+        ]
+      },
+      "properties": {
+        "station_id": "8251",
+        "station_name": "NEMOCÓN - PATIO BONITO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2746.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.806535,
+          4.30643
+        ]
+      },
+      "properties": {
+        "station_id": "8244",
+        "station_name": "P_UNICUNDINAMARCA",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 286.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.63499965,
+          5.5374681
+        ]
+      },
+      "properties": {
+        "station_id": "19566",
+        "station_name": "RAQUIRA - COLEGIO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2200.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.643417,
+          5.461464
+        ]
+      },
+      "properties": {
+        "station_id": "31806",
+        "station_name": "RAQUIRA - URBANO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.2435349,
+          4.525166711
+        ]
+      },
+      "properties": {
+        "station_id": "8247",
+        "station_name": "SIBATE - LOS SAUCES",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2567.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.19548,
+          4.573623
+        ]
+      },
+      "properties": {
+        "station_id": "31807",
+        "station_name": "SOACHA - COLEGIO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.214706,
+          4.473685
+        ]
+      },
+      "properties": {
+        "station_id": "31863",
+        "station_name": "SOACHA - COLISEO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2444.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.271698,
+          4.559249
+        ]
+      },
+      "properties": {
+        "station_id": "31864",
+        "station_name": "SOACHA - UDPG",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 4687.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.204407,
+          4.536597
+        ]
+      },
+      "properties": {
+        "station_id": "31808",
+        "station_name": "SOACHA - UNIMINUTO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.21987793,
+          4.584585267
+        ]
+      },
+      "properties": {
+        "station_id": "8246",
+        "station_name": "SOACHA-HOSPITAL",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2593.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.96195833,
+          4.943088889
+        ]
+      },
+      "properties": {
+        "station_id": "29617",
+        "station_name": "SOPO - BRICEÑO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2566.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.796539,
+          5.103191
+        ]
+      },
+      "properties": {
+        "station_id": "31868",
+        "station_name": "SUESCA - URBANO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 1245.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.84542,
+          5.247671
+        ]
+      },
+      "properties": {
+        "station_id": "31815",
+        "station_name": "SUTATAUSA - ESCUELA",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.21416596,
+          4.5763093
+        ]
+      },
+      "properties": {
+        "station_id": "8245",
+        "station_name": "Soacha-Ladrillera Santaf¿",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2583.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.87971111,
+          5.187886111
+        ]
+      },
+      "properties": {
+        "station_id": "30040",
+        "station_name": "TAUSA - ESCUELA",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2950.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.896666,
+          5.1975
+        ]
+      },
+      "properties": {
+        "station_id": "32089",
+        "station_name": "TAUSA - URBANO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2950.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.939362,
+          4.919189
+        ]
+      },
+      "properties": {
+        "station_id": "31953",
+        "station_name": "TOCANCIPA -  PQ JAIME DUQUE",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2567.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.921509,
+          4.966392
+        ]
+      },
+      "properties": {
+        "station_id": "31870",
+        "station_name": "TOCANCIPA - URBANO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 1345.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.97035,
+          4.976338889
+        ]
+      },
+      "properties": {
+        "station_id": "8250",
+        "station_name": "TOCANCIPÁ - TIBITOC",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 0.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.853531,
+          5.315546
+        ]
+      },
+      "properties": {
+        "station_id": "31954",
+        "station_name": "UBATE - COLISEO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2580.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.075317,
+          5.026523
+        ]
+      },
+      "properties": {
+        "station_id": "31952",
+        "station_name": "ZIPAQUIRA - URBANO",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2614.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.00274345,
+          5.010012989
+        ]
+      },
+      "properties": {
+        "station_id": "8252",
+        "station_name": "ZIPAQUIRÁ - EFZ",
+        "network_name": "CAR - CORPORACION AUTONOMA REGIONAL DE CUNDINAMARCA",
+        "pollutant": "PM10",
+        "timestamp": null,
+        "value": null,
+        "rolling_avg_24h": null,
+        "estado_actual": "Sin dato",
+        "tier_actual": "Sin dato",
+        "altitude": 2588.0
+      }
+    }
+  ]
+}
