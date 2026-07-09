@@ -36,3 +36,19 @@ data/processed/*
 .idea/
 .vscode/
 *.log
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+
+# Runtime DB
+*.db
+*.sqlite

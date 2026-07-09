@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://localhost:8000' : '');
 
 export function resultUrl(path) {
   if (!path) return '#';
@@ -16,6 +16,10 @@ export async function fetchStationsCatalog() {
   return apiFetch('/api/stations/catalog');
 }
 
+export async function fetchStationsList() {
+  return apiFetch('/api/stations');
+}
+
 export async function calculateAirQuality({ file, pollutant, minReadings }) {
   const formData = new FormData();
   formData.append('file', file);
@@ -28,12 +32,40 @@ export async function calculateAirQuality({ file, pollutant, minReadings }) {
   });
 }
 
+export async function createCalculationJob({ file, pollutant, minReadings }) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('pollutant', pollutant);
+  formData.append('min_valid_readings_24h', String(minReadings));
+
+  return apiFetch('/api/jobs/calculate', {
+    method: 'POST',
+    body: formData,
+  });
+}
+
 export async function runAutoSampling(payload) {
   return apiFetch('/api/auto-sampling', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
+}
+
+export async function createAutoSamplingJob(payload) {
+  return apiFetch('/api/jobs/auto-sampling', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchJob(jobId) {
+  return apiFetch(`/api/jobs/${jobId}`);
+}
+
+export async function fetchJobs(limit = 25) {
+  return apiFetch(`/api/jobs?limit=${limit}`);
 }
 
 async function apiFetch(path, options) {

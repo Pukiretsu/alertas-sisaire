@@ -32,7 +32,8 @@ class Settings:
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
     # Portal JSF / SISAIRE
-    JSF_TARGET_URL = os.getenv("JSF_TARGET_URL", "")
+    DEFAULT_JSF_TARGET_URL = "https://sisaire.ideam.gov.co/ideam-sisaire-web/consultas.xhtml"
+    JSF_TARGET_URL = os.getenv("JSF_TARGET_URL", DEFAULT_JSF_TARGET_URL)
     CHROMIUM_EXECUTABLE_PATH = os.getenv("CHROMIUM_EXECUTABLE_PATH", "")
     PLAYWRIGHT_DEFAULT_TIMEOUT_MS = int(os.getenv("PLAYWRIGHT_DEFAULT_TIMEOUT_MS", "120000"))
 
@@ -56,6 +57,9 @@ class Settings:
     # Rutas locales
     DOWNLOADS_DIR = Path(os.getenv("DOWNLOADS_DIR", str(REPO_ROOT / "downloads")))
     OUTPUTS_DIR = Path(os.getenv("OUTPUTS_DIR", str(REPO_ROOT / "outputs")))
+
+    # Persistencia de sesiones/jobs. SQLite es suficiente para desarrollo; en nube usar PostgreSQL/RDS.
+    DATABASE_URL = os.getenv("DATABASE_URL") or f"sqlite:///{OUTPUTS_DIR / 'calculation_jobs.db'}"
 
 
 def setup_logging() -> None:

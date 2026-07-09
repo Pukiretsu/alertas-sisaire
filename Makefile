@@ -1,4 +1,4 @@
-.PHONY: backend-install backend-test backend-format calculate-demo api frontend-install frontend-dev frontend-build frontend-preview clean-generated
+.PHONY: backend-install backend-test backend-format calculate-demo api compose-up compose-down frontend-install frontend-dev frontend-build frontend-preview terraform-init terraform-plan clean-generated
 
 backend-install:
 	cd backend && python -m pip install -e ".[dev]" && playwright install chromium
@@ -13,7 +13,13 @@ calculate-demo:
 	cd backend && air-quality-alerts calculate --input ../data/samples/ejemplo_pm25_bogota.csv --output ../outputs/memoria_demo.csv --excel-output ../outputs/memoria_demo.xlsx
 
 api:
-	cd backend && air-quality-alerts api
+	cd backend && air-quality-alerts api --reload
+
+compose-up:
+	docker compose up --build
+
+compose-down:
+	docker compose down
 
 frontend-install:
 	cd frontend && npm install
@@ -26,6 +32,12 @@ frontend-build:
 
 frontend-preview:
 	cd frontend && npm run preview
+
+terraform-init:
+	cd infra/terraform && terraform init
+
+terraform-plan:
+	cd infra/terraform && terraform plan
 
 clean-generated:
 	rm -rf outputs/* downloads/* backend/.pytest_cache backend/.ruff_cache frontend/.vite

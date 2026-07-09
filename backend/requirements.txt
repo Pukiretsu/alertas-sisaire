@@ -11,3 +11,6 @@ colorlog==6.8.2
 pytest==8.0.2
 black==24.2.0
 ruff==0.3.4
+
+sqlalchemy==2.0.30
+psycopg[binary]==3.1.18

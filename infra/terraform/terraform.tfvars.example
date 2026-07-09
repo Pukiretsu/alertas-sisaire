@@ -1,0 +1,8 @@
+aws_region        = "us-east-1"
+project_name      = "air-quality-alerts"
+environment       = "prod"
+backend_image_uri = "123456789012.dkr.ecr.us-east-1.amazonaws.com/air-quality-alerts-prod-backend:latest"
+jsf_target_url    = "https://sisaire.ideam.gov.co/ideam-sisaire-web/consultas.xhtml"
+allowed_origins   = "*"
+desired_count     = 1
+create_rds        = true

@@ -1,101 +1,58 @@
 # Arquitectura técnica
 
-## Flujo de extremo a extremo
+## Vista lógica
 
 ```text
-                    ┌──────────────────────────────┐
-                    │ SPA React + Vite + Tailwind   │
-                    │ frontend/src + frontend/dist  │
-                    └──────────────┬───────────────┘
-                                   │
-                 ┌─────────────────┴─────────────────┐
-                 │                                   │
-                 ▼                                   ▼
-       Carga manual CSV/XLSX              Muestreo automático
-                 │                         con Playwright
-                 │                                   │
-                 ▼                                   ▼
-          POST /api/calculate              POST /api/auto-sampling
-                 │                                   │
-                 │                         Portal JSF/SISAIRE
-                 │                                   │
-                 │                         CSV descargado
-                 └─────────────────┬─────────────────┘
-                                   ▼
-                        AirQualityAlertEngine
-                 ┌─────────────────┼─────────────────┐
-                 ▼                 ▼                 ▼
-       Normalización       Media móvil 24h    Monitoreo 48 lecturas
-                 │                 │                 │
-                 └─────────────────┴─────────────────┘
-                                   ▼
-              Persistencia > 75% y clasificación PM2.5
-                                   │
-                 ┌─────────────────┼─────────────────┐
-                 ▼                 ▼                 ▼
-       memoria_calculo.csv  resumen_estaciones.csv  stations.geojson
-                                   │
-                                   ▼
-                     Mapa Leaflet + tabla de estaciones
+Usuario
+  │
+  ▼
+React SPA ────────► FastAPI
+  │                    │
+  │                    ├── JobRepository SQLite/PostgreSQL
+  │                    ├── Playwright Downloader por estación
+  │                    ├── Motor AirQualityAlertEngine
+  │                    └── Artefactos: CSV, XLSX, GeoJSON
+  │
+  └── Mapa Leaflet + Panel de sesiones
 ```
 
-## Componentes
+## Flujo de carga manual
 
-### 1. SPA web
+1. El usuario sube CSV/XLS/XLSX desde la SPA.
+2. FastAPI crea un job en estado `queued`.
+3. El archivo se guarda en la carpeta de la sesión.
+4. Un background task ejecuta lectura, normalización, cálculo y exportación.
+5. La SPA consulta `/api/jobs/{job_id}` cada 1.5 segundos.
+6. Al finalizar, el resultado se carga en mapa, tabla y panel de descargas.
 
-`frontend/src/`
+## Flujo de muestreo automático
 
-Aplicación React de una sola vista. En la parte superior permite elegir entre carga manual y muestreo automático. Mientras la API procesa, muestra el avance lógico del cálculo. Al finalizar, permite descargar memorias de cálculo y actualiza el mapa GIS con el GeoJSON generado por el backend.
+1. La SPA crea un job en `/api/jobs/auto-sampling`.
+2. El backend resuelve las estaciones solicitadas o todas las registradas.
+3. Playwright descarga estación por estación.
+4. Los CSV descargados se consolidan en `auto_sampling_raw.csv`.
+5. El motor calcula media móvil 24h, persistencia 48 lecturas y alerta declarada.
+6. Se publican memoria CSV, memoria Excel, resumen y GeoJSON.
 
-El build estático queda en `frontend/dist` y puede desplegarse en un hosting estático, S3, Nginx o similar.
+## Vista AWS
 
-### 2. Ingesta automática
+```text
+CloudFront HTTPS
+  ├── Default origin: S3 privado frontend
+  └── /api/* origin: ALB HTTP
+                    │
+                    ▼
+               ECS Fargate
+                    │
+        ┌───────────┴───────────┐
+        ▼                       ▼
+   RDS PostgreSQL              EFS outputs
+```
 
-`backend/src/air_quality_alerts/ingestion/playwright_downloader.py`
+## Decisiones cloud
 
-Automatiza el portal JSF/SISAIRE con Playwright, selecciona estaciones, contaminante, fechas, granularidad horaria y descarga un CSV. Los selectores están aislados para facilitar ajustes cuando el portal cambie.
-
-### 3. Dominio / cálculo
-
-`backend/src/air_quality_alerts/domain/engine.py`
-
-Contiene la lógica central del proyecto. No depende de la API ni del frontend, por lo que puede usarse desde CLI, jobs programados, pruebas o servicios web.
-
-Reglas principales:
-
-- Agrupa lecturas por estación.
-- Calcula media móvil de 24 horas.
-- Clasifica PM2.5 en Normal, Prevención, Alerta y Emergencia.
-- Si se detecta superación, inicia seguimiento de 48 lecturas.
-- Declara alerta si más del 75% de las lecturas monitoreadas superan el umbral.
-
-### 4. API
-
-`backend/src/air_quality_alerts/api/main.py`
-
-Endpoints principales:
-
-- `POST /api/calculate`: recibe CSV/XLSX/XLS manual.
-- `POST /api/auto-sampling`: descarga datos con Playwright y calcula resultados.
-- `GET /api/results/{result_id}/{filename}`: descarga memoria, resumen, GeoJSON o CSV fuente.
-
-### 5. Visualización GIS
-
-`frontend/src/components/BogotaMap.jsx`
-
-Usa Leaflet + OpenStreetMap para visualizar estaciones como puntos GeoJSON. Cada punto muestra estado actual, medición, media móvil de 24 horas y fecha de lectura.
-
-## Despliegue sugerido
-
-- Backend: contenedor Docker, VM, ECS, Cloud Run, App Service o similar.
-- Frontend: `frontend/dist` en hosting estático.
-- Archivos generados: volumen local o bucket de objetos.
-- Descarga automática: endpoint bajo demanda o job programado.
-
-## Escalabilidad futura
-
-- Persistir resultados históricos en base de datos.
-- Agendar descarga automática con cron, Airflow, Celery Beat o EventBridge.
-- Parametrizar umbrales por contaminante desde base de datos.
-- Agregar autenticación para perfiles técnico/operativo.
-- Publicar resultados como API pública GeoJSON.
+- CloudFront enruta `/api/*` al ALB para evitar mixed content desde el navegador.
+- Fargate ejecuta el backend en contenedor sin administrar servidores.
+- RDS conserva sesiones y progreso.
+- EFS conserva artefactos generados por cualquier tarea Fargate.
+- S3 se mantiene privado mediante Origin Access Control.

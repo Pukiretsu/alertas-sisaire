@@ -1,15 +1,15 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Modal from './Modal.jsx';
-import { calculateAirQuality, runAutoSampling, resultUrl } from '../services/api.js';
+import { createAutoSamplingJob, createCalculationJob, fetchJob, fetchStationsList, resultUrl } from '../services/api.js';
 
 const DEFAULT_STATIONS = '29586,31877,8249,31862,8254,8243,31867,31866,31865,31860';
 
 const baseSteps = [
-  'Preparar datos',
-  'Enviar a API Python',
-  'Calcular media móvil 24h',
-  'Evaluar persistencia 48 lecturas',
-  'Generar CSV, Excel y GeoJSON',
+  'Crear sesión',
+  'Preparar entrada',
+  'Normalizar datos',
+  'Calcular alertas',
+  'Publicar artefactos',
 ];
 
 export default function ProcessPanel({ result, setResult, activeProcess, setActiveProcess }) {
@@ -17,6 +17,8 @@ export default function ProcessPanel({ result, setResult, activeProcess, setActi
   const [pollutant, setPollutant] = useState('PM2.5');
   const [minReadings, setMinReadings] = useState(18);
   const [stations, setStations] = useState(DEFAULT_STATIONS);
+  const [downloadAllRegistered, setDownloadAllRegistered] = useState(true);
+  const [registeredStationsCount, setRegisteredStationsCount] = useState(0);
   const [startDate, setStartDate] = useState('2026-01-01');
   const [endDate, setEndDate] = useState('2026-01-03');
   const [status, setStatus] = useState('idle');
@@ -26,7 +28,17 @@ export default function ProcessPanel({ result, setResult, activeProcess, setActi
   const [showResultModal, setShowResultModal] = useState(false);
   const [showFormatModal, setShowFormatModal] = useState(false);
   const [steps, setSteps] = useState(baseSteps.map((label) => ({ label, state: 'pending' })));
+  const [activeJob, setActiveJob] = useState(null);
   const inputRef = useRef(null);
+  const pollingRef = useRef(null);
+
+  useEffect(() => {
+    fetchStationsList()
+      .then((payload) => setRegisteredStationsCount(Number(payload?.count || 0)))
+      .catch(() => setRegisteredStationsCount(0));
+  }, []);
+
+  useEffect(() => () => clearPolling(), []);
 
   const hasResult = Boolean(result?.result_id);
   const stationList = useMemo(
@@ -34,8 +46,9 @@ export default function ProcessPanel({ result, setResult, activeProcess, setActi
     [stations],
   );
 
-  const completedSteps = steps.filter((step) => step.state === 'done').length;
-  const progress = status === 'done' ? 100 : status === 'idle' ? 0 : Math.max(12, Math.round((completedSteps / baseSteps.length) * 100));
+  const progress = status === 'idle'
+    ? 0
+    : Math.round(Number(activeJob?.progress ?? (status === 'done' ? 100 : 0)));
 
   const downloadLinks = useMemo(() => {
     if (!hasResult) return [];
@@ -45,7 +58,7 @@ export default function ProcessPanel({ result, setResult, activeProcess, setActi
       ['Resumen estaciones CSV', result.download_summary_url, 'Último estado consolidado por estación'],
       ['GeoJSON estaciones', result.geojson_url, 'Capa GIS para visualización en mapa'],
     ];
-    if (result.download_raw_url) links.push(['CSV descargado Playwright', result.download_raw_url, 'Datos crudos obtenidos del portal']);
+    if (result.download_raw_url) links.push(['CSV consolidado descargado', result.download_raw_url, 'Datos crudos descargados por estación y unificados']);
     return links.filter(([, href]) => Boolean(href));
   }, [hasResult, result]);
 
@@ -58,14 +71,12 @@ export default function ProcessPanel({ result, setResult, activeProcess, setActi
       return;
     }
 
-    setStatus('running');
-    animateStart();
+    startUiProcess('Creando sesión para carga manual...');
 
     try {
-      markStep(0, 'done');
-      markStep(1, 'running');
-      const payload = await calculateAirQuality({ file, pollutant, minReadings });
-      finishProcess(payload);
+      const job = await createCalculationJob({ file, pollutant, minReadings });
+      applyJob(job);
+      monitorJob(job.id);
     } catch (err) {
       failProcess(err.message);
     }
@@ -74,38 +85,73 @@ export default function ProcessPanel({ result, setResult, activeProcess, setActi
   async function runAutomaticSampling() {
     setShowAutoConfirm(false);
     setError('');
-    setStatus('running');
-    animateStart();
+    startUiProcess('Creando sesión para descarga automática...');
 
     try {
-      markStep(0, 'done');
-      markStep(1, 'running');
-      const payload = await runAutoSampling({
+      const job = await createAutoSamplingJob({
         estaciones: stationList,
         contaminante: pollutant,
         fecha_inicio: startDate,
         fecha_fin: endDate,
         min_valid_readings_24h: Number(minReadings),
+        download_all_registered: downloadAllRegistered,
+        continue_on_error: true,
       });
-      finishProcess(payload);
+      applyJob(job);
+      monitorJob(job.id);
     } catch (err) {
       failProcess(err.message);
     }
   }
 
-  function animateStart() {
-    setSteps(baseSteps.map((label, index) => ({ label, state: index === 0 ? 'running' : 'pending' })));
+  function startUiProcess(message) {
+    clearPolling();
+    setStatus('running');
+    setActiveJob({ progress: 3, message, current_step: 'Preparación', events: [] });
+    setSteps(buildStepsFromProgress(3));
   }
 
-  function markStep(index, state) {
-    setSteps((current) => current.map((step, i) => (i === index ? { ...step, state } : step)));
+  function clearPolling() {
+    if (pollingRef.current) window.clearInterval(pollingRef.current);
+    pollingRef.current = null;
   }
 
-  function finishProcess(payload) {
-    setSteps(baseSteps.map((label) => ({ label, state: 'done' })));
-    setResult(payload);
-    setStatus('done');
-    setShowResultModal(true);
+  async function monitorJob(jobId) {
+    clearPolling();
+
+    async function poll() {
+      try {
+        const job = await fetchJob(jobId);
+        applyJob(job);
+        if (['completed', 'failed', 'cancelled'].includes(job.status)) clearPolling();
+      } catch (err) {
+        clearPolling();
+        failProcess(err.message);
+      }
+    }
+
+    await poll();
+    pollingRef.current = window.setInterval(poll, 1500);
+  }
+
+  function applyJob(job) {
+    setActiveJob(job);
+    setSteps(buildStepsFromProgress(Number(job?.progress || 0), job?.status));
+
+    if (job.status === 'completed' && job.result_payload) {
+      setResult(job.result_payload);
+      setStatus('done');
+      setShowResultModal(true);
+      return;
+    }
+
+    if (job.status === 'failed') {
+      setError(job.error || job.message || 'No fue posible completar el proceso.');
+      setStatus('error');
+      return;
+    }
+
+    setStatus(job.status === 'queued' ? 'running' : job.status || 'running');
   }
 
   function failProcess(message) {
@@ -133,7 +179,7 @@ export default function ProcessPanel({ result, setResult, activeProcess, setActi
           <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Proceso de cálculo</p>
           <h2 className="mt-1 text-2xl font-black tracking-tight">Entrada de datos</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Elige una carga manual para generar memorias o activa el muestreo automático para poblar el mapa con datos descargados por Playwright.
+            Cada ejecución crea una sesión consultable. La barra de carga refleja el progreso persistido por el backend.
           </p>
         </div>
         <button
@@ -146,23 +192,21 @@ export default function ProcessPanel({ result, setResult, activeProcess, setActi
       </div>
 
       <div className="mb-5 grid grid-cols-2 rounded-2xl bg-slate-100 p-1 text-sm font-black">
-        <button
-          type="button"
-          onClick={() => setActiveProcess('manual')}
-          className={tabClass(activeProcess === 'manual')}
-        >
+        <button type="button" onClick={() => setActiveProcess('manual')} className={tabClass(activeProcess === 'manual')}>
           Carga manual
         </button>
-        <button
-          type="button"
-          onClick={() => setActiveProcess('auto')}
-          className={tabClass(activeProcess === 'auto')}
-        >
+        <button type="button" onClick={() => setActiveProcess('auto')} className={tabClass(activeProcess === 'auto')}>
           Muestreo auto
         </button>
       </div>
 
-      <StatusBanner status={status} activeProcess={activeProcess} file={file} stationCount={stationList.length} />
+      <StatusBanner
+        status={status}
+        activeProcess={activeProcess}
+        file={file}
+        stationCount={downloadAllRegistered ? registeredStationsCount || stationList.length : stationList.length}
+        activeJob={activeJob}
+      />
 
       {activeProcess === 'manual' ? (
         <form onSubmit={runManualUpload} className="mt-4 space-y-4">
@@ -203,8 +247,8 @@ export default function ProcessPanel({ result, setResult, activeProcess, setActi
 
           <CommonControls pollutant={pollutant} setPollutant={setPollutant} minReadings={minReadings} setMinReadings={setMinReadings} />
 
-          <button type="submit" disabled={status === 'running'} className="btn-primary">
-            {status === 'running' ? 'Procesando archivo...' : 'Generar memoria de cálculo'}
+          <button type="submit" disabled={['running', 'queued'].includes(status)} className="btn-primary">
+            {status === 'running' ? 'Procesando sesión...' : 'Generar memoria de cálculo'}
           </button>
         </form>
       ) : (
@@ -220,42 +264,58 @@ export default function ProcessPanel({ result, setResult, activeProcess, setActi
             </Field>
           </div>
 
-          <Field label="Estaciones" hint="IDs separados por coma. Se enviarán a la API para la descarga automática.">
+          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-bold text-slate-700">
+            <input
+              type="checkbox"
+              checked={downloadAllRegistered}
+              onChange={(event) => setDownloadAllRegistered(event.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-slate-300"
+            />
+            <span>
+              Descargar todas las estaciones registradas
+              <span className="mt-1 block text-xs font-semibold text-slate-500">
+                {registeredStationsCount ? `${registeredStationsCount} estaciones del catálogo local.` : 'Usa el catálogo local disponible en el backend.'}
+              </span>
+            </span>
+          </label>
+
+          <Field label="Estaciones" hint="IDs separados por coma. Se ignora si activas todas las registradas.">
             <textarea
               value={stations}
               onChange={(event) => setStations(event.target.value)}
               rows="3"
               placeholder="29586,31877,8249"
+              disabled={downloadAllRegistered}
+              className={downloadAllRegistered ? 'opacity-60' : ''}
             />
           </Field>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-black text-slate-800">Estaciones seleccionadas</p>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-600 shadow-sm">{stationList.length}</span>
+              <p className="text-sm font-black text-slate-800">Estaciones a consultar</p>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-600 shadow-sm">
+                {downloadAllRegistered ? registeredStationsCount || 'Catálogo' : stationList.length}
+              </span>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {stationList.slice(0, 8).map((station) => (
-                <span key={station} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-sm ring-1 ring-slate-200">
-                  {station}
-                </span>
-              ))}
-              {stationList.length > 8 && <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">+{stationList.length - 8}</span>}
-            </div>
+            {!downloadAllRegistered && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {stationList.slice(0, 8).map((station) => (
+                  <span key={station} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-sm ring-1 ring-slate-200">
+                    {station}
+                  </span>
+                ))}
+                {stationList.length > 8 && <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">+{stationList.length - 8}</span>}
+              </div>
+            )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowAutoConfirm(true)}
-            disabled={status === 'running'}
-            className="btn-primary"
-          >
+          <button type="button" onClick={() => setShowAutoConfirm(true)} disabled={['running', 'queued'].includes(status)} className="btn-primary">
             {status === 'running' ? 'Descargando y calculando...' : 'Activar muestreo automático'}
           </button>
         </div>
       )}
 
-      <ProcessSteps steps={steps} progress={progress} />
+      <ProcessSteps steps={steps} progress={progress} activeJob={activeJob} />
 
       {error && (
         <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">
@@ -269,35 +329,33 @@ export default function ProcessPanel({ result, setResult, activeProcess, setActi
         </div>
       )}
 
-      {hasResult && (
-        <ResultCard result={result} downloadLinks={downloadLinks} onOpenDetails={() => setShowResultModal(true)} />
-      )}
+      {hasResult && <ResultCard result={result} downloadLinks={downloadLinks} onOpenDetails={() => setShowResultModal(true)} activeJob={activeJob} />}
 
       <Modal
         open={showAutoConfirm}
         onClose={() => setShowAutoConfirm(false)}
         title="Confirmar muestreo automático"
-        eyebrow="Playwright"
+        eyebrow="Playwright por estación"
         footer={
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button type="button" onClick={() => setShowAutoConfirm(false)} className="btn-secondary sm:w-auto">
               Cancelar
             </button>
             <button type="button" onClick={runAutomaticSampling} className="btn-primary sm:w-auto">
-              Iniciar descarga
+              Crear sesión e iniciar
             </button>
           </div>
         }
       >
         <div className="space-y-4 text-sm leading-6 text-slate-600">
           <p>
-            La API abrirá el flujo de descarga con Playwright, tomará los datos del portal configurado y ejecutará el motor de cálculo con los parámetros actuales.
+            La API descargará el CSV estación por estación, consolidará los archivos descargados y luego ejecutará el motor de cálculo. El progreso quedará registrado en la sesión.
           </p>
           <div className="grid gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
             <ConfirmItem label="Contaminante" value={pollutant} />
             <ConfirmItem label="Lecturas válidas" value={`${minReadings}/24`} />
             <ConfirmItem label="Rango" value={`${startDate} a ${endDate}`} />
-            <ConfirmItem label="Estaciones" value={stationList.length} />
+            <ConfirmItem label="Estaciones" value={downloadAllRegistered ? `${registeredStationsCount || 'Todas'} registradas` : stationList.length} />
           </div>
           <p className="rounded-2xl bg-amber-50 p-4 font-bold text-amber-900 ring-1 ring-amber-200">
             Verifica que el backend tenga configurada la variable JSF_TARGET_URL antes de iniciar el muestreo automático.
@@ -343,20 +401,10 @@ export default function ProcessPanel({ result, setResult, activeProcess, setActi
         </div>
       </Modal>
 
-      <Modal
-        open={showFormatModal}
-        onClose={() => setShowFormatModal(false)}
-        title="Formato recomendado de entrada"
-        eyebrow="Carga manual"
-        footer={
-          <button type="button" onClick={() => setShowFormatModal(false)} className="btn-primary max-w-xs">
-            Entendido
-          </button>
-        }
-      >
+      <Modal open={showFormatModal} onClose={() => setShowFormatModal(false)} title="Formato recomendado de entrada" eyebrow="Carga manual" footer={<button type="button" onClick={() => setShowFormatModal(false)} className="btn-primary max-w-xs">Entendido</button>}>
         <div className="space-y-4 text-sm leading-6 text-slate-600">
           <p>
-            Para generar memorias de cálculo confiables, el archivo debe incluir datos por estación, fecha/hora y concentración del contaminante. El motor acepta CSV, XLSX y XLS.
+            Para generar memorias confiables, el archivo debe incluir datos por estación, fecha/hora y concentración del contaminante. El motor acepta CSV, XLSX y XLS.
           </p>
           <div className="overflow-hidden rounded-3xl border border-slate-200">
             <table className="min-w-full text-sm">
@@ -375,16 +423,13 @@ export default function ProcessPanel({ result, setResult, activeProcess, setActi
               </tbody>
             </table>
           </div>
-          <p className="rounded-2xl bg-blue-50 p-4 font-bold text-blue-900 ring-1 ring-blue-100">
-            UX tip: primero prueba con el archivo demo del repositorio y luego carga datos reales para validar columnas y resultados.
-          </p>
         </div>
       </Modal>
     </aside>
   );
 }
 
-function StatusBanner({ status, activeProcess, file, stationCount }) {
+function StatusBanner({ status, activeProcess, file, stationCount, activeJob }) {
   const content = {
     idle: {
       title: activeProcess === 'manual' ? 'Listo para cargar archivo' : 'Listo para muestreo automático',
@@ -392,8 +437,13 @@ function StatusBanner({ status, activeProcess, file, stationCount }) {
       className: 'border-blue-100 bg-blue-50 text-blue-900',
     },
     running: {
-      title: 'Proceso en ejecución',
-      text: activeProcess === 'manual' ? `Procesando ${file?.name || 'archivo seleccionado'}...` : 'Descargando datos y calculando alertas...',
+      title: activeJob?.current_step || 'Proceso en ejecución',
+      text: activeJob?.message || (activeProcess === 'manual' ? `Procesando ${file?.name || 'archivo seleccionado'}...` : 'Descargando datos y calculando alertas...'),
+      className: 'border-amber-100 bg-amber-50 text-amber-900',
+    },
+    queued: {
+      title: 'Sesión en cola',
+      text: activeJob?.message || 'Esperando inicio del procesamiento.',
       className: 'border-amber-100 bg-amber-50 text-amber-900',
     },
     done: {
@@ -411,17 +461,18 @@ function StatusBanner({ status, activeProcess, file, stationCount }) {
   return (
     <div className={`rounded-3xl border p-4 ${content.className}`}>
       <div className="flex items-center gap-3">
-        <span className={`h-3 w-3 rounded-full ${status === 'running' ? 'animate-pulse bg-amber-500' : status === 'done' ? 'bg-emerald-500' : status === 'error' ? 'bg-rose-500' : 'bg-blue-500'}`} />
+        <span className={`h-3 w-3 rounded-full ${status === 'running' || status === 'queued' ? 'animate-pulse bg-amber-500' : status === 'done' ? 'bg-emerald-500' : status === 'error' ? 'bg-rose-500' : 'bg-blue-500'}`} />
         <div>
           <p className="text-sm font-black">{content.title}</p>
           <p className="mt-0.5 text-xs font-semibold opacity-80">{content.text}</p>
         </div>
       </div>
+      {activeJob?.id && <p className="mt-3 break-all text-[11px] font-bold opacity-70">Sesión: {activeJob.id}</p>}
     </div>
   );
 }
 
-function ResultCard({ result, downloadLinks, onOpenDetails }) {
+function ResultCard({ result, downloadLinks, onOpenDetails, activeJob }) {
   return (
     <div className="mt-4 rounded-3xl border border-emerald-200 bg-emerald-50 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -430,6 +481,7 @@ function ResultCard({ result, downloadLinks, onOpenDetails }) {
           <p className="mt-1 text-sm text-emerald-800">
             {result.rows} registros, {result.stations} estaciones y {result.declared_alerts} alertas declaradas.
           </p>
+          {activeJob?.id && <p className="mt-1 break-all text-[11px] font-bold text-emerald-700">Sesión {activeJob.id}</p>}
         </div>
         <button type="button" onClick={onOpenDetails} className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-emerald-800 shadow-sm transition hover:bg-emerald-100">
           Ver
@@ -457,13 +509,7 @@ function CommonControls({ pollutant, setPollutant, minReadings, setMinReadings }
         </select>
       </Field>
       <Field label="Lecturas válidas 24h">
-        <input
-          type="number"
-          min="1"
-          max="24"
-          value={minReadings}
-          onChange={(event) => setMinReadings(Number(event.target.value))}
-        />
+        <input type="number" min="1" max="24" value={minReadings} onChange={(event) => setMinReadings(Number(event.target.value))} />
       </Field>
     </div>
   );
@@ -481,7 +527,8 @@ function Field({ label, hint, children }) {
   );
 }
 
-function ProcessSteps({ steps, progress }) {
+function ProcessSteps({ steps, progress, activeJob }) {
+  const events = (activeJob?.events || []).slice(-6).reverse();
   return (
     <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -499,6 +546,18 @@ function ProcessSteps({ steps, progress }) {
           </li>
         ))}
       </ol>
+      {events.length > 0 && (
+        <div className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-slate-200">
+          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">Últimas actualizaciones</p>
+          <div className="mt-2 space-y-2">
+            {events.map((event) => (
+              <div key={`${event.timestamp}-${event.progress}`} className="text-xs font-semibold text-slate-600">
+                <span className="font-black text-slate-900">{event.progress}%</span> · {event.step} · {event.message}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -528,6 +587,21 @@ function FormatRow({ field, example }) {
       <td className="px-4 py-3 font-semibold text-slate-600">{example}</td>
     </tr>
   );
+}
+
+function buildStepsFromProgress(progress, status = 'running') {
+  if (status === 'failed') {
+    return baseSteps.map((label, index) => ({ label, state: index === 0 ? 'done' : index === 1 ? 'error' : 'pending' }));
+  }
+  if (status === 'completed') return baseSteps.map((label) => ({ label, state: 'done' }));
+
+  const thresholds = [5, 25, 65, 82, 95];
+  const currentIndex = thresholds.findIndex((threshold) => progress < threshold);
+  return baseSteps.map((label, index) => {
+    if (currentIndex === -1 || index < currentIndex) return { label, state: 'done' };
+    if (index === currentIndex) return { label, state: 'running' };
+    return { label, state: 'pending' };
+  });
 }
 
 function tabClass(active) {

@@ -1,15 +1,39 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: airquality
+      POSTGRES_USER: airquality
+      POSTGRES_PASSWORD: airquality
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airquality -d airquality"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       API_HOST: 0.0.0.0
       API_PORT: 8000
       OUTPUTS_DIR: /app/outputs
       DOWNLOADS_DIR: /app/downloads
+      DATABASE_URL: postgresql+psycopg://airquality:airquality@db:5432/airquality
       ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173
+      JSF_TARGET_URL: ${JSF_TARGET_URL:-https://sisaire.ideam.gov.co/ideam-sisaire-web/consultas.xhtml}
     ports:
       - "8000:8000"
     volumes:
       - ./outputs:/app/outputs
       - ./downloads:/app/downloads
+
+volumes:
+  postgres_data:

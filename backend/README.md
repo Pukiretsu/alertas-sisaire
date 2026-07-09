@@ -1,37 +1,37 @@
-# Backend - Air Quality Alerts Bogotá
+# Backend FastAPI
 
-Backend Python/FastAPI para descarga, cálculo y exposición de resultados del motor de alertas PM2.5.
+Backend del proyecto Air Quality Alerts Bogotá. Incluye:
 
-## Comandos rápidos
+- API FastAPI.
+- Motor de cálculo PM2.5 con Pandas.
+- Descarga automática con Playwright.
+- Sesiones/jobs persistentes con progreso y eventos.
+- SQLite por defecto o PostgreSQL usando `DATABASE_URL`.
+
+## Ejecutar local
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 playwright install chromium
+cp .env.example .env
+air-quality-alerts api --reload
 ```
+
+## Probar healthcheck
 
 ```bash
-air-quality-alerts api
+curl http://localhost:8000/api/health
 ```
 
-```bash
-air-quality-alerts calculate --input ../data/samples/ejemplo_pm25_bogota.csv --output ../outputs/memoria_demo.csv
+## Endpoints de sesiones
+
+```text
+POST /api/jobs/calculate
+POST /api/jobs/auto-sampling
+GET  /api/jobs
+GET  /api/jobs/{job_id}
 ```
 
-Ejemplo con reporte horario real de SISAIRE:
-
-```bash
-air-quality-alerts calculate \
-  --input ../data/samples/reporte_sisaire_pm25_horario.csv \
-  --output ../outputs/memoria_reporte_sisaire_pm25_horario.csv \
-  --excel-output ../outputs/memoria_reporte_sisaire_pm25_horario.xlsx
-```
-
-## Endpoints
-
-- `POST /api/calculate`: carga manual de CSV/XLSX/XLS.
-- `POST /api/auto-sampling`: descarga con Playwright + cálculo.
-- `GET /api/results/{result_id}/{filename}`: descarga de artefactos generados.
-
-Consulta la documentación completa en el README de la raíz del repositorio.
+Cada sesión guarda `status`, `progress`, `current_step`, `message`, `events`, errores y el `result_payload` final.

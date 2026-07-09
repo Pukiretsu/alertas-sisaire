@@ -11,7 +11,8 @@ La solución combina un backend Python con FastAPI, un motor de cálculo basado 
 - Normalización de columnas para formatos tipo SISAIRE, reportes horarios, reportes diarios y formatos manuales.
 - Cálculo de media móvil real de 24 horas por estación para reportes horarios, con soporte para reportes diarios SISAIRE ya preagregados.
 - Monitoreo de 48 lecturas posteriores cuando se detecta superación de umbral.
-- Declaración de alerta cuando más del 75% de las lecturas monitoreadas superan el umbral.
+- Declaración de alerta cuando, durante las 48 lecturas posteriores al dato candidato, más del 75% de las medias móviles permanece dentro del mismo rango normativo.
+- Finalización o recategorización cuando, después de un estado declarado, más del 75% de las 48 lecturas posteriores permanece por debajo del límite inferior del nivel vigente.
 - API FastAPI para carga manual, catálogo de estaciones, muestreo automático y descarga de resultados.
 - SPA React/Vite/Tailwind con experiencia tipo dashboard: modales, drag-and-drop, confirmaciones, mapa GIS interactivo y tabla filtrable.
 - Build estático generado en `frontend/dist` para despliegue rápido.
@@ -26,6 +27,8 @@ La solución combina un backend Python con FastAPI, un motor de cálculo basado 
 | Prevención | 38 - 55 |
 | Alerta | 56 - 150 |
 | Emergencia | Mayor o igual a 151 |
+
+Nota: en la Resolución 2254 de 2017, el umbral de emergencia `>= 355 µg/m³` corresponde a PM10. Para PM2.5 el umbral de emergencia es `>= 151 µg/m³`.
 
 La ventana de 24 horas requiere, por defecto, mínimo 18 lecturas válidas para evitar decisiones con datos incompletos. Este parámetro se puede ajustar por CLI, API o desde la app web.
 
@@ -195,7 +198,7 @@ npm run preview
 Configura la URL real del portal en `backend/.env`:
 
 ```env
-JSF_TARGET_URL=https://url-del-portal-jsf
+JSF_TARGET_URL=https://sisaire.ideam.gov.co/ideam-sisaire-web/consultas.xhtml
 ```
 
 Ejemplo:
@@ -312,3 +315,7 @@ Columnas clave de la memoria:
 - Tailwind CSS
 - Leaflet + OpenStreetMap
 - Pytest
+
+## Nota Docker / Playwright
+
+El backend usa la imagen oficial `mcr.microsoft.com/playwright/python:v1.42.0-jammy`, alineada con `playwright==1.42.0` del `pyproject.toml`. Esta imagen ya incluye Chromium y las dependencias del navegador, por eso el Dockerfile no ejecuta `playwright install --with-deps chromium`; hacerlo sobre algunas bases Debian puede fallar por paquetes obsoletos como `ttf-unifont` o `ttf-ubuntu-font-family`.

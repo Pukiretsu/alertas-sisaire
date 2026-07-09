@@ -9,6 +9,7 @@ Comandos disponibles:
 from __future__ import annotations
 
 import argparse
+import os
 
 import uvicorn
 
@@ -53,6 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     api_parser = subparsers.add_parser("api", help="Levanta API FastAPI")
     api_parser.add_argument("--host", default=Settings.API_HOST)
     api_parser.add_argument("--port", type=int, default=Settings.API_PORT)
+    api_parser.add_argument("--reload", action="store_true", help="Recarga automática para desarrollo local")
 
     return parser
 
@@ -89,7 +91,8 @@ def main() -> None:
         return
 
     if args.command == "api":
-        uvicorn.run("air_quality_alerts.api.main:app", host=args.host, port=args.port, reload=True)
+        reload_enabled = args.reload or os.getenv("API_RELOAD", "false").lower() == "true"
+        uvicorn.run("air_quality_alerts.api.main:app", host=args.host, port=args.port, reload=reload_enabled)
 
 
 if __name__ == "__main__":

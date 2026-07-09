@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "air-quality-alerts-bogota"
-version = "1.4.0"
-description = "Motor de cálculo de alertas PM2.5 con FastAPI, Playwright, React, Vite y Tailwind."
+version = "2.0.0"
+description = "Motor de alertas PM2.5 con FastAPI, Playwright, sesiones persistentes, React y despliegue cloud."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Duvan Acevedo" }]
@@ -20,6 +20,8 @@ dependencies = [
   "playwright==1.42.0",
   "python-dotenv==1.0.1",
   "colorlog==6.8.2",
+  "sqlalchemy==2.0.30",
+  "psycopg[binary]==3.1.18",
 ]
 
 [project.optional-dependencies]

@@ -11,22 +11,32 @@ export default function BogotaMap({ geojson }) {
   const features = geojson?.features || [];
   const mapSummary = useMemo(() => summarizeFeatures(features), [features]);
 
+  // 1. Inicialización y Limpieza del Mapa
   useEffect(() => {
-    if (mapRef.current) return;
+    if (!mapRef.current) {
+      mapRef.current = L.map(containerId.current, {
+        center: [4.711, -74.0721],
+        zoom: 11,
+        scrollWheelZoom: true,
+        zoomControl: false, // Ocultamos el control nativo para un look más limpio
+      });
 
-    mapRef.current = L.map(containerId.current, {
-      center: [4.711, -74.0721],
-      zoom: 11,
-      scrollWheelZoom: true,
-      zoomControl: true,
-    });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(mapRef.current);
+    }
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(mapRef.current);
+    // Cleanup fundamental para React 18
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
   }, []);
 
+  // 2. Renderizado de Capas (Features GeoJSON)
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -64,42 +74,45 @@ export default function BogotaMap({ geojson }) {
   }, [features.length, geojson]);
 
   return (
-    <div className="relative">
-      <div className="absolute left-4 top-4 z-[500] hidden max-w-xs rounded-3xl border border-white/70 bg-white/95 p-4 text-slate-900 shadow-xl backdrop-blur md:block">
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">Resumen visual</p>
+    <div className="relative h-full w-full">
+      {/* Panel Superior Izquierdo (Resumen Visual) */}
+      <div className="absolute left-4 bottom-5 z-[400] hidden max-w-xs rounded-3xl border border-white/10 bg-slate-900/80 p-4 text-slate-100 shadow-2xl backdrop-blur-md md:block">
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-400">Resumen visual</p>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <MiniStat label="Estaciones" value={features.length} />
           <MiniStat label="Con alerta" value={mapSummary.withAlert} />
         </div>
-        <p className="mt-3 text-xs leading-5 text-slate-500">
+        <p className="mt-3 text-xs leading-5 text-slate-400">
           Haz clic sobre una estación para revisar medición, media móvil y estado actual.
         </p>
       </div>
 
-      <div id={containerId.current} className="h-[620px] w-full bg-slate-200 md:h-[720px]" />
+      {/* Contenedor del Mapa (Full Screen) */}
+      <div id={containerId.current} className="h-full w-full z-0 bg-[#0f172a] outline-none" />
 
+      {/* Detalle de Estación Seleccionada */}
       {selectedStation && (
-        <aside className="absolute bottom-4 left-4 right-4 z-[500] rounded-3xl border border-white/70 bg-white/95 p-4 text-slate-900 shadow-xl backdrop-blur md:left-auto md:w-[360px]">
+        <aside className="absolute bottom-6 left-4 right-4 z-[400] rounded-3xl border border-white/10 bg-slate-900/90 p-5 text-slate-100 shadow-2xl backdrop-blur-xl md:left-auto md:w-[360px] md:bottom-8 md:right-8">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">Estación seleccionada</p>
-              <h3 className="mt-1 text-lg font-black leading-tight">{selectedStation.station_name || 'Estación'}</h3>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-400">Estación seleccionada</p>
+              <h3 className="mt-1 text-lg font-black leading-tight text-white">{selectedStation.station_name || 'Estación'}</h3>
             </div>
             <button
               type="button"
               onClick={() => setSelectedStation(null)}
-              className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-lg font-black text-slate-500 transition hover:bg-slate-200 hover:text-slate-900"
+              className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-lg font-black text-slate-300 transition hover:bg-rose-500 hover:text-white"
               aria-label="Cerrar detalle de estación"
             >
               ×
             </button>
           </div>
 
-          <div className="mt-3">
+          <div className="mt-4">
             <StatusBadge status={selectedStation.tier_actual || selectedStation.estado_actual} />
           </div>
 
-          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+          <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
             <StationData label="Medición" value={formatNumber(selectedStation.value)} />
             <StationData label="Media 24h" value={formatNumber(selectedStation.rolling_avg_24h)} />
             <StationData label="Estado" value={selectedStation.estado_actual || selectedStation.station_current_status || 'Sin dato'} />
@@ -111,10 +124,13 @@ export default function BogotaMap({ geojson }) {
   );
 }
 
+// === FUNCIONES DE APOYO Y UTILIDADES ===
+
 function buildPopup(properties) {
+  // Ajustado con colores más oscuros para combinar con el nuevo tema
   return `
     <div style="padding:14px; min-width:220px; font-family:Inter,system-ui,sans-serif;">
-      <p style="margin:0 0 6px; font-size:11px; text-transform:uppercase; letter-spacing:.12em; font-weight:900; color:#2563eb;">Detalle de estación</p>
+      <p style="margin:0 0 6px; font-size:11px; text-transform:uppercase; letter-spacing:.12em; font-weight:900; color:#0ea5e9;">Detalle de estación</p>
       <strong style="display:block; font-size:16px; color:#0f172a; line-height:1.2;">${properties.station_name || 'Estación'}</strong>
       <div style="margin-top:10px; display:grid; gap:6px; font-size:13px; color:#475569;">
         <span><b>Tier:</b> ${properties.tier_actual || 'Sin dato'}</span>
@@ -128,18 +144,18 @@ function buildPopup(properties) {
 
 function MiniStat({ label, value }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-3 text-center ring-1 ring-slate-200">
+    <div className="rounded-2xl bg-white/5 p-3 text-center ring-1 ring-white/10">
       <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">{label}</p>
-      <p className="mt-1 text-xl font-black text-slate-950">{value}</p>
+      <p className="mt-1 text-xl font-black text-white">{value}</p>
     </div>
   );
 }
 
 function StationData({ label, value }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+    <div className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
       <dt className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">{label}</dt>
-      <dd className="mt-1 break-words font-black text-slate-800">{value}</dd>
+      <dd className="mt-1 break-words font-black text-slate-200">{value}</dd>
     </div>
   );
 }

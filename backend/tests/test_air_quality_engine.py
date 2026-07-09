@@ -89,3 +89,35 @@ def test_sisaire_hourly_report_uses_real_24h_rolling_average(tmp_path):
 
     full_window = result[result["valid_readings_24h"] == 24].iloc[0]
     assert full_window["rolling_avg_24h"] == 17.5
+
+
+def test_pm25_emergency_threshold_is_151_not_355():
+    engine = AirQualityAlertEngine(min_valid_readings_24h=18)
+    result = engine.calculate(engine.normalize(_hourly_dataframe([160] * 72)))
+
+    assert result[result["is_complete_24h"]].iloc[0]["tier_actual"] == "Emergencia"
+
+
+def test_finalizes_alert_after_48_readings_below_lower_limit():
+    values = [60] * 90 + [10] * 90
+    engine = AirQualityAlertEngine(min_valid_readings_24h=18)
+    result = engine.calculate(engine.normalize(_hourly_dataframe(values)))
+
+    assert result["declared_alert"].any()
+    assert result["finalized_alert"].any()
+    finalization = result[result["finalized_alert"]].iloc[0]
+    assert finalization["calculation_status"] == "Finalizada - Normal"
+    assert finalization["below_lower_ratio"] > 0.75
+
+
+def test_recategorizes_alert_to_prevention_after_48_readings_below_alert_limit():
+    values = [60] * 90 + [42] * 90
+    engine = AirQualityAlertEngine(min_valid_readings_24h=18)
+    result = engine.calculate(engine.normalize(_hourly_dataframe(values)))
+
+    assert result["declared_alert"].any()
+    assert result["recategorized_alert"].any()
+    recategorization = result[result["recategorized_alert"]].iloc[0]
+    assert recategorization["declared_tier"] == "Prevención"
+    assert recategorization["station_current_status"] == "Declarada - Prevención"
+    assert recategorization["below_lower_ratio"] > 0.75

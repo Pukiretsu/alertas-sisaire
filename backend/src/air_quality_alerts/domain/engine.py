@@ -10,17 +10,18 @@ El motor acepta archivos CSV o Excel y normaliza formatos reales de SISAIRE:
 
 Después de normalizar, enriquece estaciones sin coordenadas usando el catálogo local
 `data/catalog/stations_sisaire_car.csv`, calcula medias móviles de 24 horas por
-estación y aplica una regla de persistencia de 48 lecturas con más del 75 % del tiempo
-sobre el umbral.
+estación y aplica la lógica de declaratoria, finalización y recategorización descrita
+en la Resolución 2254 de 2017 para PM2.5.
 """
 
 from __future__ import annotations
 
-import json
 import logging
+from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any
 
 import pandas as pd
 
@@ -39,6 +40,29 @@ class ThresholdTier:
     severity: int
 
 
+@dataclass
+class MonitoringTrack:
+    """Seguimiento horario de 48 lecturas para declaratoria o cierre."""
+
+    track_id: str
+    kind: str
+    start_position: int
+    start_index: int
+    start_time: pd.Timestamp
+    evaluation_positions: list[int]
+    target_tier: str
+    target_severity: int
+    threshold_lower: float
+
+    @property
+    def end_position(self) -> int | None:
+        if not self.evaluation_positions:
+            return None
+        return self.evaluation_positions[-1]
+
+
+# Tabla 4 Resolución 2254 de 2017 para PM2.5, exposición 24 horas.
+# Nota: el umbral >=355 corresponde a PM10, no a PM2.5.
 PM25_TIERS: tuple[ThresholdTier, ...] = (
     ThresholdTier("Prevención", 38.0, 55.999999, 1),
     ThresholdTier("Alerta", 56.0, 150.999999, 2),
@@ -113,19 +137,35 @@ MEMORY_COLUMNS = [
     "rolling_avg_24h",
     "is_complete_24h",
     "tier_actual",
+    "tier_severity",
     "threshold_lower",
     "alert_candidate",
     "monitoring_status",
+    "monitoring_type",
+    "monitoring_track_id",
+    "monitoring_target_tier",
     "monitoring_start",
     "monitoring_end",
     "monitoring_threshold",
     "monitoring_readings_count",
+    "same_range_readings_count",
+    "same_range_ratio",
     "exceedance_readings_count",
     "exceedance_ratio",
+    "below_lower_readings_count",
+    "below_lower_ratio",
+    "parallel_monitoring_count",
+    "active_monitoring_ids",
+    "monitoring_event",
     "declared_alert",
     "declared_tier",
+    "finalized_alert",
+    "recategorized_alert",
+    "state_transition",
     "calculation_status",
     "station_current_status",
+    "state_tier",
+    "state_started_at",
     "latitude",
     "longitude",
     "altitude",
@@ -133,7 +173,7 @@ MEMORY_COLUMNS = [
 
 
 class AirQualityAlertEngine:
-    """Calcula medias móviles, seguimiento y declaración de alertas."""
+    """Calcula medias móviles, seguimientos paralelos y estados de alerta."""
 
     def __init__(
         self,
@@ -154,7 +194,9 @@ class AirQualityAlertEngine:
         self.station_catalog_path = Path(station_catalog_path) if station_catalog_path else None
         self._station_catalog: pd.DataFrame | None = None
 
-    def run_pipeline(self, input_path: str | Path, output_path: str | Path | None = None) -> pd.DataFrame:
+    def run_pipeline(
+        self, input_path: str | Path, output_path: str | Path | None = None
+    ) -> pd.DataFrame:
         """Ejecuta lectura, normalización, cálculo y exportación opcional a CSV."""
         raw_df = self.read_file(input_path)
         normalized_df = self.normalize(raw_df)
@@ -169,11 +211,7 @@ class AirQualityAlertEngine:
         return calculated_df
 
     def export_memory_excel(self, calculated_df: pd.DataFrame, output_path: str | Path) -> Path:
-        """Genera una memoria de cálculo en Excel con resumen, detalle y parámetros.
-
-        Esta salida está pensada para revisión funcional: incluye resumen por estación,
-        memoria completa, parámetros del modelo y diccionario de columnas.
-        """
+        """Genera una memoria de cálculo en Excel con resumen, detalle y parámetros."""
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -183,27 +221,40 @@ class AirQualityAlertEngine:
                 ["Contaminante", self.pollutant],
                 ["Ventana de media móvil", self.rolling_window],
                 ["Mínimo lecturas válidas 24h", self.min_valid_readings_24h],
-                ["Lecturas de monitoreo", self.monitoring_readings],
-                ["Porcentaje persistencia", self.persistence_ratio],
-                ["Umbral Prevención", "38 - 55"],
-                ["Umbral Alerta", "56 - 150"],
-                ["Umbral Emergencia", ">= 151"],
+                ["Lecturas de seguimiento", self.monitoring_readings],
+                ["Criterio de persistencia", f"> {self.persistence_ratio:.0%}"],
+                ["Umbral Prevención PM2.5", "38 - 55 µg/m³"],
+                ["Umbral Alerta PM2.5", "56 - 150 µg/m³"],
+                ["Umbral Emergencia PM2.5", ">= 151 µg/m³"],
+                ["Nota normativa", "El umbral >=355 µg/m³ corresponde a PM10, no a PM2.5."],
             ],
             columns=["Parámetro", "Valor"],
         )
         dictionary = pd.DataFrame(
             [
-                ["source_format", "Formato detectado del archivo: sisaire_hourly_report, sisaire_daily_24h_report, car_long_report o manual_input."],
-                ["reading_interval_minutes", "Resolución estimada de la lectura. Para reporte horario SISAIRE normalmente es 60 minutos."],
-                ["value", "Medición original normalizada del contaminante."],
-                ["rolling_avg_24h", "Media móvil de 24 horas o promedio 24h preagregado si el reporte viene diario."],
-                ["valid_readings_24h", "Cantidad de lecturas válidas en la ventana de 24 horas."],
-                ["tier_actual", "Clasificación según umbrales PM2.5."],
-                ["alert_candidate", "Indica si la media 24h superó algún umbral."],
-                ["monitoring_status", "Estado de la ventana de seguimiento de 48 lecturas."],
-                ["exceedance_ratio", "Proporción de lecturas que superaron el umbral durante el seguimiento."],
-                ["declared_alert", "Marca la lectura en la que se declara formalmente una alerta."],
-                ["station_current_status", "Estado vigente para visualización en mapa."],
+                [
+                    "source_format",
+                    "Formato detectado: sisaire_hourly_report, sisaire_daily_24h_report, car_long_report o manual_input.",
+                ],
+                ["rolling_avg_24h", "Media móvil de 24 horas por estación."],
+                ["tier_actual", "Clasificación de cada media móvil según rangos PM2.5."],
+                ["alert_candidate", "Indica que la media móvil se encuentra en Prevención, Alerta o Emergencia."],
+                [
+                    "monitoring_type",
+                    "declaration para declaratoria; closure para finalización o recategorización.",
+                ],
+                [
+                    "same_range_ratio",
+                    "Proporción de las 48 lecturas posteriores que permanecen en el mismo rango del candidato.",
+                ],
+                [
+                    "below_lower_ratio",
+                    "Proporción de las 48 lecturas posteriores por debajo del límite inferior del estado declarado.",
+                ],
+                ["declared_alert", "Marca una declaratoria o mantenimiento confirmado del nivel."],
+                ["finalized_alert", "Marca la finalización del estado excepcional."],
+                ["recategorized_alert", "Marca una recategorización del estado declarado."],
+                ["station_current_status", "Estado vigente por estación para visualización en mapa."],
             ],
             columns=["Campo", "Descripción"],
         )
@@ -221,7 +272,10 @@ class AirQualityAlertEngine:
                 for cell in worksheet[1]:
                     cell.style = "Headline 3"
                 for column_cells in worksheet.columns:
-                    max_length = max(len(str(cell.value)) if cell.value is not None else 0 for cell in column_cells)
+                    max_length = max(
+                        len(str(cell.value)) if cell.value is not None else 0
+                        for cell in column_cells
+                    )
                     adjusted_width = min(max(max_length + 2, 12), 42)
                     worksheet.column_dimensions[column_cells[0].column_letter].width = adjusted_width
 
@@ -264,19 +318,31 @@ class AirQualityAlertEngine:
 
         records = pd.DataFrame(index=clean_df.index)
         records["station_id"] = self._optional_column(clean_df, mapped_columns.get("station_id"))
-        records["station_name"] = self._required_column(clean_df, mapped_columns.get("station_name"), "estación")
+        records["station_name"] = self._required_column(
+            clean_df, mapped_columns.get("station_name"), "estación"
+        )
         records["pollutant"] = self._extract_pollutant(clean_df, mapped_columns)
         records["timestamp"] = self._parse_datetime(raw_start)
         records["end_time"] = self._parse_datetime(raw_end)
         records["value"] = self._parse_number(
             self._required_column(clean_df, mapped_columns.get("value"), "valor/medición")
         )
-        records["latitude"] = self._parse_number(self._optional_column(clean_df, mapped_columns.get("latitude")))
-        records["longitude"] = self._parse_number(self._optional_column(clean_df, mapped_columns.get("longitude")))
-        records["altitude"] = self._parse_number(self._optional_column(clean_df, mapped_columns.get("altitude")))
+        records["latitude"] = self._parse_number(
+            self._optional_column(clean_df, mapped_columns.get("latitude"))
+        )
+        records["longitude"] = self._parse_number(
+            self._optional_column(clean_df, mapped_columns.get("longitude"))
+        )
+        records["altitude"] = self._parse_number(
+            self._optional_column(clean_df, mapped_columns.get("altitude"))
+        )
         records["input_granularity"] = self._detect_input_granularity(raw_start, raw_end)
-        records["source_format"] = self._detect_source_format(clean_df.columns, records["input_granularity"])
-        records["reading_interval_minutes"] = self._detect_reading_interval_minutes(raw_start, raw_end)
+        records["source_format"] = self._detect_source_format(
+            clean_df.columns, records["input_granularity"]
+        )
+        records["reading_interval_minutes"] = self._detect_reading_interval_minutes(
+            raw_start, raw_end
+        )
 
         records = records.dropna(subset=["station_name", "timestamp", "value"])
         records["station_name"] = records["station_name"].astype(str).str.strip()
@@ -293,7 +359,8 @@ class AirQualityAlertEngine:
         records = self._enrich_with_station_catalog(records)
         records["station_id"] = records["station_id"].where(
             records["station_id"].notna(), records["station_name"]
-        ).astype(str).str.strip()
+        )
+        records["station_id"] = records["station_id"].astype(str).str.strip()
         records["pollutant"] = self.pollutant
         records = records.sort_values(["station_name", "timestamp"]).reset_index(drop=True)
 
@@ -303,7 +370,7 @@ class AirQualityAlertEngine:
         return records
 
     def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Calcula media móvil de 24h, estado por lectura y monitoreo de 48 lecturas."""
+        """Calcula media móvil de 24h y aplica declaratoria/cierre por estación."""
         calculated = df.copy().sort_values(["station_name", "timestamp"]).reset_index(drop=True)
         calculated["input_granularity"] = calculated.get("input_granularity", "hourly")
 
@@ -347,8 +414,10 @@ class AirQualityAlertEngine:
         calculated["alert_candidate"] = calculated["tier_severity"] > 0
 
         calculated = self._apply_monitoring(calculated)
-        calculated = self._append_current_station_status(calculated)
-        return calculated[[column for column in MEMORY_COLUMNS if column in calculated.columns] + [column for column in calculated.columns if column not in MEMORY_COLUMNS]]
+        return calculated[
+            [column for column in MEMORY_COLUMNS if column in calculated.columns]
+            + [column for column in calculated.columns if column not in MEMORY_COLUMNS]
+        ]
 
     def to_station_summary(self, calculated_df: pd.DataFrame) -> pd.DataFrame:
         """Devuelve el último estado y medición disponible por estación."""
@@ -365,6 +434,7 @@ class AirQualityAlertEngine:
             "value",
             "rolling_avg_24h",
             "station_current_status",
+            "state_tier",
             "tier_actual",
             "latitude",
             "longitude",
@@ -394,14 +464,19 @@ class AirQualityAlertEngine:
                         "station_id": str(row.get("station_id", "")),
                         "station_name": row.get("station_name", ""),
                         "pollutant": row.get("pollutant", self.pollutant),
-                        "timestamp": row["timestamp"].isoformat() if pd.notna(row.get("timestamp")) else None,
+                        "timestamp": row["timestamp"].isoformat()
+                        if pd.notna(row.get("timestamp"))
+                        else None,
                         "value": None if pd.isna(row.get("value")) else float(row.get("value")),
                         "rolling_avg_24h": None
                         if pd.isna(row.get("rolling_avg_24h"))
                         else float(row.get("rolling_avg_24h")),
                         "estado_actual": row.get("station_current_status", "Sin dato"),
+                        "state_tier": row.get("state_tier", "Normal"),
                         "tier_actual": row.get("tier_actual", "Sin dato"),
-                        "altitude": None if pd.isna(row.get("altitude")) else float(row.get("altitude")),
+                        "altitude": None
+                        if pd.isna(row.get("altitude"))
+                        else float(row.get("altitude")),
                     },
                 }
             )
@@ -427,95 +502,398 @@ class AirQualityAlertEngine:
         summary["rolling_avg_24h"] = pd.NA
         summary["station_current_status"] = "Sin dato"
         summary["tier_actual"] = "Sin dato"
+        summary["state_tier"] = "Sin dato"
         return self.summary_to_geojson(summary)
 
     def _apply_monitoring(self, calculated: pd.DataFrame) -> pd.DataFrame:
-        calculated["monitoring_status"] = "Sin monitoreo"
+        calculated = calculated.copy()
+        calculated["monitoring_status"] = "Sin observación"
+        calculated["monitoring_type"] = ""
+        calculated["monitoring_track_id"] = ""
+        calculated["monitoring_target_tier"] = ""
         calculated["monitoring_start"] = pd.NaT
         calculated["monitoring_end"] = pd.NaT
         calculated["monitoring_threshold"] = pd.NA
         calculated["monitoring_readings_count"] = 0
+        calculated["same_range_readings_count"] = 0
+        calculated["same_range_ratio"] = pd.NA
         calculated["exceedance_readings_count"] = 0
         calculated["exceedance_ratio"] = pd.NA
+        calculated["below_lower_readings_count"] = 0
+        calculated["below_lower_ratio"] = pd.NA
+        calculated["parallel_monitoring_count"] = 0
+        calculated["active_monitoring_ids"] = ""
+        calculated["monitoring_event"] = ""
         calculated["declared_alert"] = False
         calculated["declared_tier"] = ""
+        calculated["finalized_alert"] = False
+        calculated["recategorized_alert"] = False
+        calculated["state_transition"] = ""
         calculated["calculation_status"] = "Normal"
+        calculated["station_current_status"] = "Normal"
+        calculated["state_tier"] = "Normal"
+        calculated["state_started_at"] = pd.NaT
 
         for _, station_indexes in calculated.groupby("station_name").groups.items():
             indexes = list(station_indexes)
-            position = 0
-            while position < len(indexes):
-                current_index = indexes[position]
-                current_row = calculated.loc[current_index]
+            valid_positions = [
+                position
+                for position, index in enumerate(indexes)
+                if bool(calculated.at[index, "is_complete_24h"])
+            ]
+            if not valid_positions:
+                continue
 
-                if not bool(current_row["alert_candidate"]):
-                    position += 1
-                    continue
+            active_tracks: list[MonitoringTrack] = []
+            track_counter = 0
+            current_state: dict[str, Any] | None = None
 
-                threshold = float(current_row["threshold_lower"])
-                candidate_indexes = [
-                    index
-                    for index in indexes[position:]
-                    if bool(calculated.loc[index, "is_complete_24h"])
-                ][: self.monitoring_readings]
+            for position, index in enumerate(indexes):
+                # 1. Cerrar seguimientos cuya ventana de 48 lecturas termina en esta posición.
+                completed_tracks = [
+                    track for track in active_tracks if track.end_position == position
+                ]
+                for track in completed_tracks:
+                    self._evaluate_track(calculated, indexes, track, current_state)
+                    if track.kind == "declaration":
+                        current_state = self._apply_declaration_result(
+                            calculated, indexes, track, current_state
+                        )
+                    elif track.kind == "closure":
+                        current_state = self._apply_closure_result(
+                            calculated, indexes, track, current_state
+                        )
 
-                if not candidate_indexes:
-                    position += 1
-                    continue
+                active_tracks = [track for track in active_tracks if track.end_position != position]
 
-                start_index = candidate_indexes[0]
-                end_index = candidate_indexes[-1]
-                monitoring_count = len(candidate_indexes)
-                exceedance_count = int((calculated.loc[candidate_indexes, "rolling_avg_24h"] >= threshold).sum())
-                exceedance_ratio = exceedance_count / monitoring_count if monitoring_count else 0.0
+                # 2. Iniciar seguimiento de declaratoria cada vez que una media móvil entra en un rango.
+                if bool(calculated.at[index, "alert_candidate"]):
+                    track_counter += 1
+                    track = self._build_declaration_track(
+                        calculated, indexes, valid_positions, position, index, track_counter
+                    )
+                    self._register_track(calculated, indexes, track)
+                    if track.end_position is not None:
+                        active_tracks.append(track)
 
-                calculated.loc[candidate_indexes, "monitoring_status"] = "En seguimiento"
-                calculated.loc[candidate_indexes, "monitoring_start"] = calculated.loc[start_index, "timestamp"]
-                calculated.loc[candidate_indexes, "monitoring_end"] = calculated.loc[end_index, "timestamp"]
-                calculated.loc[candidate_indexes, "monitoring_threshold"] = threshold
-                calculated.loc[candidate_indexes, "monitoring_readings_count"] = monitoring_count
-                calculated.loc[candidate_indexes, "exceedance_readings_count"] = exceedance_count
-                calculated.loc[candidate_indexes, "exceedance_ratio"] = round(exceedance_ratio, 4)
-                calculated.loc[candidate_indexes, "calculation_status"] = "Seguimiento"
+                # 3. Si ya existe estado declarado y el valor baja del límite inferior,
+                # iniciar seguimiento de finalización/recategorización.
+                if current_state and bool(calculated.at[index, "is_complete_24h"]):
+                    current_avg = calculated.at[index, "rolling_avg_24h"]
+                    if pd.notna(current_avg) and float(current_avg) < float(current_state["lower"]):
+                        track_counter += 1
+                        track = self._build_closure_track(
+                            calculated,
+                            indexes,
+                            valid_positions,
+                            position,
+                            index,
+                            track_counter,
+                            current_state,
+                        )
+                        self._register_track(calculated, indexes, track)
+                        if track.end_position is not None:
+                            active_tracks.append(track)
 
-                if monitoring_count == self.monitoring_readings:
-                    max_severity = int(calculated.loc[candidate_indexes, "tier_severity"].max())
-                    declared_tier = self._tier_name_by_severity(max_severity)
-                    if exceedance_ratio > self.persistence_ratio:
-                        calculated.loc[end_index, "declared_alert"] = True
-                        calculated.loc[end_index, "declared_tier"] = declared_tier
-                        calculated.loc[end_index, "monitoring_status"] = "Alerta declarada"
-                        calculated.loc[end_index, "calculation_status"] = f"Declarada - {declared_tier}"
-                    else:
-                        calculated.loc[end_index, "monitoring_status"] = "No declarada"
-                        calculated.loc[end_index, "calculation_status"] = "No declarada"
-                    position = indexes.index(end_index) + 1
-                else:
-                    calculated.loc[candidate_indexes, "monitoring_status"] = "Seguimiento incompleto"
-                    calculated.loc[candidate_indexes, "calculation_status"] = "Seguimiento incompleto"
-                    break
-
-        return calculated
-
-    def _append_current_station_status(self, calculated: pd.DataFrame) -> pd.DataFrame:
-        calculated["station_current_status"] = calculated["calculation_status"]
-        last_declared_by_station: dict[str, str] = {}
-
-        for index, row in calculated.sort_values(["station_name", "timestamp"]).iterrows():
-            station = row["station_name"]
-            if row["declared_alert"]:
-                last_declared_by_station[station] = row["declared_tier"]
-
-            current_tier = row["tier_actual"]
-            calculation_status = str(row["calculation_status"])
-            if station in last_declared_by_station and current_tier != "Normal":
-                calculated.at[index, "station_current_status"] = f"Declarada - {current_tier}"
-            elif current_tier == "Normal" and not calculation_status.startswith("Seguimiento"):
-                calculated.at[index, "station_current_status"] = "Normal"
+                # 4. Estado vigente para esta lectura.
+                self._write_current_state(calculated, index, current_state)
 
         return calculated
 
-    def _classify_tier(self, value: float | int | None) -> dict:
+    def _build_declaration_track(
+        self,
+        calculated: pd.DataFrame,
+        indexes: list[int],
+        valid_positions: list[int],
+        position: int,
+        index: int,
+        track_counter: int,
+    ) -> MonitoringTrack:
+        window_positions = self._next_valid_positions(valid_positions, position, self.monitoring_readings)
+        station_slug = self._track_station_slug(calculated.at[index, "station_name"])
+        return MonitoringTrack(
+            track_id=f"{station_slug}-DEC-{track_counter:04d}",
+            kind="declaration",
+            start_position=position,
+            start_index=index,
+            start_time=calculated.at[index, "timestamp"],
+            evaluation_positions=window_positions,
+            target_tier=str(calculated.at[index, "tier_actual"]),
+            target_severity=int(calculated.at[index, "tier_severity"]),
+            threshold_lower=float(calculated.at[index, "threshold_lower"]),
+        )
+
+    def _build_closure_track(
+        self,
+        calculated: pd.DataFrame,
+        indexes: list[int],
+        valid_positions: list[int],
+        position: int,
+        index: int,
+        track_counter: int,
+        current_state: dict[str, Any],
+    ) -> MonitoringTrack:
+        window_positions = self._next_valid_positions(valid_positions, position, self.monitoring_readings)
+        station_slug = self._track_station_slug(calculated.at[index, "station_name"])
+        return MonitoringTrack(
+            track_id=f"{station_slug}-FIN-{track_counter:04d}",
+            kind="closure",
+            start_position=position,
+            start_index=index,
+            start_time=calculated.at[index, "timestamp"],
+            evaluation_positions=window_positions,
+            target_tier=str(current_state["tier"]),
+            target_severity=int(current_state["severity"]),
+            threshold_lower=float(current_state["lower"]),
+        )
+
+    def _register_track(
+        self,
+        calculated: pd.DataFrame,
+        indexes: list[int],
+        track: MonitoringTrack,
+    ) -> None:
+        start_index = track.start_index
+        start_label = "Declaratoria" if track.kind == "declaration" else "Cierre/recategorización"
+        self._append_event(calculated, start_index, f"{start_label} iniciada: {track.track_id}")
+
+        calculated.at[start_index, "monitoring_status"] = (
+            "Observación iniciada"
+            if track.evaluation_positions
+            else "Observación iniciada sin datos suficientes"
+        )
+        calculated.at[start_index, "monitoring_type"] = track.kind
+        calculated.at[start_index, "monitoring_track_id"] = track.track_id
+        calculated.at[start_index, "monitoring_target_tier"] = track.target_tier
+        calculated.at[start_index, "monitoring_start"] = track.start_time
+        calculated.at[start_index, "monitoring_threshold"] = track.threshold_lower
+
+        if len(track.evaluation_positions) < self.monitoring_readings:
+            calculated.at[start_index, "calculation_status"] = "Observación incompleta"
+            return
+
+        end_index = indexes[track.evaluation_positions[-1]]
+        window_time = calculated.at[end_index, "timestamp"]
+        for window_position in track.evaluation_positions:
+            window_index = indexes[window_position]
+            current_ids = [
+                value
+                for value in str(calculated.at[window_index, "active_monitoring_ids"]).split("|")
+                if value
+            ]
+            current_ids.append(track.track_id)
+            calculated.at[window_index, "active_monitoring_ids"] = "|".join(current_ids)
+            calculated.at[window_index, "parallel_monitoring_count"] = len(current_ids)
+            if calculated.at[window_index, "calculation_status"] == "Normal":
+                calculated.at[window_index, "calculation_status"] = "Observación activa"
+            if calculated.at[window_index, "monitoring_status"] == "Sin observación":
+                calculated.at[window_index, "monitoring_status"] = "En observación"
+
+        calculated.at[start_index, "monitoring_end"] = window_time
+
+    def _evaluate_track(
+        self,
+        calculated: pd.DataFrame,
+        indexes: list[int],
+        track: MonitoringTrack,
+        current_state: dict[str, Any] | None,
+    ) -> None:
+        if len(track.evaluation_positions) < self.monitoring_readings or track.end_position is None:
+            return
+
+        window_indexes = [indexes[position] for position in track.evaluation_positions]
+        end_index = indexes[track.end_position]
+        calculated.at[end_index, "monitoring_status"] = "Seguimiento evaluado"
+        calculated.at[end_index, "monitoring_type"] = track.kind
+        calculated.at[end_index, "monitoring_track_id"] = track.track_id
+        calculated.at[end_index, "monitoring_target_tier"] = track.target_tier
+        calculated.at[end_index, "monitoring_start"] = track.start_time
+        calculated.at[end_index, "monitoring_end"] = calculated.at[end_index, "timestamp"]
+        calculated.at[end_index, "monitoring_threshold"] = track.threshold_lower
+        calculated.at[end_index, "monitoring_readings_count"] = len(window_indexes)
+
+        if track.kind == "declaration":
+            same_count = int((calculated.loc[window_indexes, "tier_actual"] == track.target_tier).sum())
+            same_ratio = same_count / len(window_indexes)
+            calculated.at[end_index, "same_range_readings_count"] = same_count
+            calculated.at[end_index, "same_range_ratio"] = round(same_ratio, 4)
+            calculated.at[end_index, "exceedance_readings_count"] = same_count
+            calculated.at[end_index, "exceedance_ratio"] = round(same_ratio, 4)
+            if same_ratio > self.persistence_ratio:
+                calculated.at[end_index, "monitoring_status"] = "Declaratoria validada"
+                self._append_event(
+                    calculated,
+                    end_index,
+                    f"{track.track_id}: persistencia {same_ratio:.2%} en {track.target_tier}",
+                )
+            else:
+                calculated.at[end_index, "monitoring_status"] = "Declaratoria descartada"
+                calculated.at[end_index, "calculation_status"] = "Declaratoria descartada"
+                self._append_event(
+                    calculated,
+                    end_index,
+                    f"{track.track_id}: descartada por persistencia {same_ratio:.2%}",
+                )
+            return
+
+        below_count = int(
+            (calculated.loc[window_indexes, "rolling_avg_24h"] < track.threshold_lower).sum()
+        )
+        below_ratio = below_count / len(window_indexes)
+        calculated.at[end_index, "below_lower_readings_count"] = below_count
+        calculated.at[end_index, "below_lower_ratio"] = round(below_ratio, 4)
+        if below_ratio > self.persistence_ratio:
+            calculated.at[end_index, "monitoring_status"] = "Cierre/recategorización validado"
+            self._append_event(
+                calculated,
+                end_index,
+                f"{track.track_id}: {below_ratio:.2%} por debajo de {track.threshold_lower}",
+            )
+        else:
+            calculated.at[end_index, "monitoring_status"] = "Cierre/recategorización descartado"
+            self._append_event(
+                calculated,
+                end_index,
+                f"{track.track_id}: descartado, solo {below_ratio:.2%} por debajo",
+            )
+            if current_state:
+                calculated.at[end_index, "calculation_status"] = f"Se mantiene - {current_state['tier']}"
+
+    def _apply_declaration_result(
+        self,
+        calculated: pd.DataFrame,
+        indexes: list[int],
+        track: MonitoringTrack,
+        current_state: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if track.end_position is None:
+            return current_state
+        end_index = indexes[track.end_position]
+        ratio = calculated.at[end_index, "same_range_ratio"]
+        if pd.isna(ratio) or float(ratio) <= self.persistence_ratio:
+            return current_state
+
+        # Si ya hay un nivel más crítico vigente, la disminución se procesa por Artículo 13.
+        if current_state and track.target_severity < int(current_state["severity"]):
+            calculated.at[end_index, "calculation_status"] = f"Se mantiene - {current_state['tier']}"
+            self._append_event(
+                calculated,
+                end_index,
+                f"{track.track_id}: nivel inferior confirmado, pendiente criterio de recategorización",
+            )
+            return current_state
+
+        if current_state is None:
+            transition = f"Declarada - {track.target_tier}"
+            state_started_at = calculated.at[end_index, "timestamp"]
+        elif track.target_severity > int(current_state["severity"]):
+            transition = f"Recategorizada ascendente - {track.target_tier}"
+            state_started_at = calculated.at[end_index, "timestamp"]
+        else:
+            transition = f"Se mantiene - {track.target_tier}"
+            state_started_at = current_state["started_at"]
+
+        calculated.at[end_index, "declared_alert"] = True
+        calculated.at[end_index, "declared_tier"] = track.target_tier
+        calculated.at[end_index, "state_transition"] = transition
+        calculated.at[end_index, "calculation_status"] = transition
+
+        return {
+            "tier": track.target_tier,
+            "severity": track.target_severity,
+            "lower": track.threshold_lower,
+            "started_at": state_started_at,
+        }
+
+    def _apply_closure_result(
+        self,
+        calculated: pd.DataFrame,
+        indexes: list[int],
+        track: MonitoringTrack,
+        current_state: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if track.end_position is None or current_state is None:
+            return current_state
+        end_index = indexes[track.end_position]
+        ratio = calculated.at[end_index, "below_lower_ratio"]
+        if pd.isna(ratio) or float(ratio) <= self.persistence_ratio:
+            return current_state
+
+        window_indexes = [indexes[position] for position in track.evaluation_positions]
+        resulting_tier = self._dominant_tier_below_threshold(
+            calculated.loc[window_indexes], threshold=track.threshold_lower
+        )
+        resulting_severity = self._tier_severity_by_name(resulting_tier)
+
+        if resulting_severity > 0:
+            if resulting_severity == int(current_state["severity"]):
+                transition = f"Se mantiene - {resulting_tier}"
+                state_started_at = current_state["started_at"]
+            else:
+                transition = f"Recategorizada - {resulting_tier}"
+                calculated.at[end_index, "recategorized_alert"] = True
+                state_started_at = calculated.at[end_index, "timestamp"]
+            calculated.at[end_index, "declared_tier"] = resulting_tier
+            new_state = {
+                "tier": resulting_tier,
+                "severity": resulting_severity,
+                "lower": float(self._tier_by_name(resulting_tier).lower),
+                "started_at": state_started_at,
+            }
+        else:
+            transition = "Finalizada - Normal"
+            calculated.at[end_index, "finalized_alert"] = True
+            new_state = None
+
+        calculated.at[end_index, "state_transition"] = transition
+        calculated.at[end_index, "calculation_status"] = transition
+        return new_state
+
+    def _write_current_state(
+        self, calculated: pd.DataFrame, index: int, current_state: dict[str, Any] | None
+    ) -> None:
+        if current_state:
+            calculated.at[index, "state_tier"] = current_state["tier"]
+            calculated.at[index, "state_started_at"] = current_state["started_at"]
+            if not str(calculated.at[index, "calculation_status"]).startswith(
+                ("Declarada", "Recategorizada", "Finalizada", "Se mantiene")
+            ):
+                calculated.at[index, "calculation_status"] = f"Estado vigente - {current_state['tier']}"
+            calculated.at[index, "station_current_status"] = f"Declarada - {current_state['tier']}"
+        else:
+            calculated.at[index, "state_tier"] = "Normal"
+            calculated.at[index, "station_current_status"] = "Normal"
+            if str(calculated.at[index, "calculation_status"]) == "Normal":
+                calculated.at[index, "calculation_status"] = "Normal"
+
+    def _next_valid_positions(
+        self, valid_positions: list[int], position: int, count: int
+    ) -> list[int]:
+        return [valid_position for valid_position in valid_positions if valid_position > position][
+            :count
+        ]
+
+    def _dominant_tier_below_threshold(self, window: pd.DataFrame, threshold: float) -> str:
+        below = window.loc[window["rolling_avg_24h"] < threshold].copy()
+        if below.empty:
+            return "Normal"
+
+        counts = Counter(str(value) for value in below["tier_actual"].fillna("Normal"))
+        if not counts:
+            return "Normal"
+
+        # En caso de empate se escoge el nivel más crítico como criterio conservador.
+        return max(counts, key=lambda tier_name: (counts[tier_name], self._tier_severity_by_name(tier_name)))
+
+    def _append_event(self, calculated: pd.DataFrame, index: int, event: str) -> None:
+        current = str(calculated.at[index, "monitoring_event"] or "")
+        calculated.at[index, "monitoring_event"] = f"{current} | {event}".strip(" |")
+
+    def _track_station_slug(self, station_name: str) -> str:
+        normalized = self._normalize_label(station_name)
+        return "".join(character for character in normalized.upper() if character.isalnum())[:16]
+
+    def _classify_tier(self, value: float | int | None) -> dict[str, Any]:
         if pd.isna(value):
             return {"tier": "Sin dato", "severity": 0, "lower": pd.NA}
 
@@ -532,6 +910,20 @@ class AirQualityAlertEngine:
             if tier.severity == severity:
                 return tier.name
         return "Normal"
+
+    def _tier_severity_by_name(self, name: str) -> int:
+        if name == "Normal":
+            return 0
+        for tier in self.tiers:
+            if tier.name == name:
+                return tier.severity
+        return 0
+
+    def _tier_by_name(self, name: str) -> ThresholdTier:
+        for tier in self.tiers:
+            if tier.name == name:
+                return tier
+        raise ValueError(f"Tier no configurado: {name}")
 
     def _resolve_columns(self, columns: Iterable[str]) -> dict[str, str]:
         normalized_lookup = {self._normalize_label(column): column for column in columns}
@@ -613,8 +1005,12 @@ class AirQualityAlertEngine:
     def _detect_source_format(self, columns: Iterable[str], granularity: pd.Series) -> pd.Series:
         """Identifica el formato de origen para trazabilidad de la memoria de cálculo."""
         normalized_columns = {self._normalize_label(column) for column in columns}
-        is_sisaire_report = {"estacion", "fecha inicial", "pm2.5"}.issubset(normalized_columns)
-        is_car_long_report = {"med concentracion estandar", "fecha inicio"}.issubset(normalized_columns)
+        is_sisaire_report = {"estacion", "fecha inicial", "pm2.5"}.issubset(
+            normalized_columns
+        )
+        is_car_long_report = {"med concentracion estandar", "fecha inicio"}.issubset(
+            normalized_columns
+        )
 
         if is_sisaire_report:
             values = [
@@ -627,12 +1023,10 @@ class AirQualityAlertEngine:
             values = ["manual_input"] * len(granularity)
         return pd.Series(values, index=granularity.index)
 
-    def _detect_reading_interval_minutes(self, start_series: pd.Series, end_series: pd.Series) -> pd.Series:
-        """Estima la resolución de la lectura a partir de Fecha inicial/final.
-
-        En reportes horarios SISAIRE, `Fecha final` suele cerrar en HH:59, por lo que
-        se suma un minuto para representar una ventana horaria completa de 60 minutos.
-        """
+    def _detect_reading_interval_minutes(
+        self, start_series: pd.Series, end_series: pd.Series
+    ) -> pd.Series:
+        """Estima la resolución de la lectura a partir de Fecha inicial/final."""
         start = self._parse_datetime(start_series)
         end = self._parse_datetime(end_series)
         interval = (end - start).dt.total_seconds().div(60).round()
@@ -701,11 +1095,16 @@ class AirQualityAlertEngine:
             "catalog_longitude",
             "catalog_altitude",
         ]
-        catalog = catalog[[column for column in merge_columns if column in catalog.columns]].drop_duplicates("station_name_key")
+        catalog = catalog[[column for column in merge_columns if column in catalog.columns]]
+        catalog = catalog.drop_duplicates("station_name_key")
         enriched = enriched.merge(catalog, on="station_name_key", how="left")
 
-        missing_station_id = enriched["station_id"].isna() | (enriched["station_id"].astype(str).str.strip() == "")
-        enriched.loc[missing_station_id, "station_id"] = enriched.loc[missing_station_id, "catalog_station_id"]
+        missing_station_id = enriched["station_id"].isna() | (
+            enriched["station_id"].astype(str).str.strip() == ""
+        )
+        enriched.loc[missing_station_id, "station_id"] = enriched.loc[
+            missing_station_id, "catalog_station_id"
+        ]
 
         for target, source in (
             ("latitude", "catalog_latitude"),
